@@ -1,0 +1,48 @@
+# =============================================================================
+# CineMetrics AI - Python Dependencies
+# =============================================================================
+# Regla del hackathon: SOLO Google AI. NO instalar openai, anthropic, etc.
+# Instalar con: pip install -r requirements.txt
+# Recomendado: crear un entorno virtual primero.
+#   python -m venv .venv
+#   .venv\Scripts\activate   (Windows)
+#   source .venv/bin/activate (Linux/Mac)
+
+# -----------------------------------------------------------------------------
+# GOOGLE AI SDK (OBLIGATORIO - Regla #1 del hackathon)
+# SDK oficial de Google para acceder a modelos Gemini via API.
+# Docs: https://ai.google.dev/gemini-api/docs/quickstart?lang=python
+# -----------------------------------------------------------------------------
+google-genai>=1.10.0
+
+# -----------------------------------------------------------------------------
+# MCP (Model Context Protocol) CLIENT (OBLIGATORIO - Regla #2 del hackathon)
+# Cliente Python oficial para comunicarse con servidores MCP via stdio/SSE.
+# El servidor mcp-clickhouse se ejecuta como proceso separado.
+# Docs: https://github.com/modelcontextprotocol/python-sdk
+# -----------------------------------------------------------------------------
+mcp>=1.3.0
+
+# -----------------------------------------------------------------------------
+# FRONTEND / UI
+# Streamlit: framework para crear dashboards analíticos en minutos con Python.
+# Elegido por su velocidad de desarrollo y soporte nativo de DataFrames/tablas.
+# -----------------------------------------------------------------------------
+streamlit>=1.40.0
+
+# -----------------------------------------------------------------------------
+# DATA & UTILITIES
+# -----------------------------------------------------------------------------
+pandas>=2.2.0          # Manipulación de DataFrames para mostrar resultados
+plotly>=5.22.0         # Gráficos interactivos con estética neon para el dashboard
+python-dotenv>=1.0.0   # Carga variables de entorno desde archivo .env
+pydantic>=2.7.0              # Validación de datos y modelos de configuración
+pydantic-settings>=2.3.0     # BaseSettings para cargar variables de entorno (Pydantic v2)
+httpx>=0.27.0          # Cliente HTTP async (requerido por mcp sdk)
+anyio>=4.4.0           # Runtime async compatible (requerido por mcp sdk)
+
+# -----------------------------------------------------------------------------
+# LOGGING & OBSERVABILIDAD
+# -----------------------------------------------------------------------------
+structlog>=24.1.0      # Logging estructurado (JSON) para producción
+rich>=13.7.0           # Output enriquecido en terminal durante desarrollo

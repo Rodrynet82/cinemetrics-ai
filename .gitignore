@@ -1,0 +1,58 @@
+# =============================================================================
+# CineMetrics AI - .gitignore
+# =============================================================================
+
+# Entorno virtual
+.venv/
+venv/
+env/
+ENV/
+
+# Variables de entorno (NUNCA subir al repositorio)
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Streamlit cache
+.streamlit/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Jupyter (si se usa para exploración)
+.ipynb_checkpoints/
+*.ipynb
+
+# Cobertura de tests
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Distribuciones / paquetes
+*.tar.gz
+*.zip
