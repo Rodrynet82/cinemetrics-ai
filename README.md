@@ -116,7 +116,7 @@ cinemetrics-ai/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/tu-usuario/cinemetrics-ai.git
+git clone https://github.com/Rodrynet82/cinemetrics-ai.git
 cd cinemetrics-ai
 ```
 
