@@ -1,13 +1,19 @@
 """
-app.py - CineMetrics AI · Box Office Dashboard (Neon Holographic · i18n)
-=========================================================================
-Rediseño con soporte multiidioma (ES / EN).
+app.py - CineMetrics AI · Box Office Dashboard (Neon Holographic · i18n · Full Suite)
+=====================================================================================
+Suite completa con:
+  - Tab 📊 DASHBOARD: Filtros interactivos (Género/Territorio/Período), KPIs dinámicos y exportación de Briefing Ejecutivo
+  - Tab 🎮 WHAT-IF SIMULATOR: Simulador interactivo de estrenos con sliders, curvas de proyección y ROI
+  - Tab 📰 INDUSTRY NEWS: Radar de noticias de la industria con análisis de impacto financiero con Gemini
+  - Tab 🤖 AI ANALYST: Chat en lenguaje natural con Gemini + servidor MCP ClickHouse
+
 Ejecutar con: streamlit run app.py
 """
 
 import logging
 import sys
 import time
+import json
 from datetime import datetime
 
 import pandas as pd
@@ -25,7 +31,7 @@ logger = logging.getLogger(__name__)
 # PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="CineMetrics AI · Box Office Dashboard",
+    page_title="CineMetrics AI · Box Office Intelligence",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -37,13 +43,23 @@ st.set_page_config(
 TRANSLATIONS: dict[str, dict] = {
     "ES": {
         # Header
-        "sys_subtitle":   "SISTEMA DE INTELIGENCIA TAQUILLERA · v2.0",
+        "sys_subtitle":   "SISTEMA DE INTELIGENCIA TAQUILLERA & MARKETING · v2.5",
         "live_label":     "EN VIVO",
         "mode_demo":      "MODO DEMO",
         "mode_live":      "CLICKHOUSE LIVE",
         # Tabs
         "tab_dashboard":  "📊  DASHBOARD",
+        "tab_simulator":  "🎮  SIMULADOR WHAT-IF",
+        "tab_news":       "📰  NOTICIAS & RADAR",
         "tab_ai":         "🤖  AI ANALYST",
+        # Quick Filters
+        "flt_genre":      "Género",
+        "flt_territory":  "Territorio",
+        "flt_period":     "Período",
+        "all_genres":     ["Todos los Géneros", "Sci-Fi / Ficción", "Acción & Aventura", "Drama", "Terror / Horror", "Animación"],
+        "all_territories":["Global", "Norteamérica (US/CA)", "Europa (EU)", "Asia-Pacífico", "Latinoamérica"],
+        "all_periods":    ["Trimestre Actual (Q3)", "Últimos 12 Meses", "Proyección Q4", "Histórico 2025-2026"],
+        "btn_export_brief": "📄 Exportar Briefing Ejecutivo",
         # KPI strip
         "kpi_box_office": "🌍 Taquilla Global",
         "kpi_tickets":    "🎟️ Entradas Q3",
@@ -51,10 +67,10 @@ TRANSLATIONS: dict[str, dict] = {
         "kpi_films":      "🎞️ Películas Activas",
         "kpi_viewers":    "👁️ Viewers Live",
         # Card titles
-        "c_box_office":   "📈 TAQUILLA GLOBAL · FIN DE SEMANA",
+        "c_box_office":   "📈 TAQUILLA GLOBAL · EVOLUCIÓN SEMANAL",
         "c_engagement":   "🎯 ENGAGEMENT DE AUDIENCIA",
         "c_sat_score":    "PUNTUACIÓN DE SATISFACCIÓN",
-        "c_demo":         "👥 DEMOGRAFÍA",
+        "c_demo":         "👥 DEMOGRAFÍA & AUDIENCIA",
         "c_traffic":      "👁️ TRÁFICO EN TIEMPO REAL",
         "c_viewers":      "Espectadores Actuales",
         "c_markets":      "MERCADOS",
@@ -65,23 +81,22 @@ TRANSLATIONS: dict[str, dict] = {
         "c_positive":     "POSITIVO 74%",
         "c_predict":      "🤖 PREDICCIONES IA",
         # Chart labels
-        "weeks":          ["Sem 1","Sem 2","Sem 3","Sem 4","Sem 5"],
-        "weeks_eng":      ["Sem 1","Sem 2","Sem 3","Sem 4","Sem 5","Sem 6","Sem 7","Sem 8","Sem 9","Sem 10","Sem 11","Sem 12"],
-        "annot_peak":     "▲ 22%  Sem 3: $312M",
+        "weeks":          ["Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5"],
+        "weeks_eng":      ["Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6", "Sem 7", "Sem 8", "Sem 9", "Sem 10", "Sem 11", "Sem 12"],
+        "annot_peak":     "▲ 22%  Pico Sem 3",
         "donut_center":   "88%\nSCORE",
         "hover_ticket":   "Sem %{x}: %{y}%",
-        # Regional card numbers
-        "reg_asia":  "$620M", "reg_us": "$450M", "reg_eu": "$380M",
+        # Regional numbers
+        "reg_asia": "$620M", "reg_us": "$450M", "reg_eu": "$380M",
         # Sentiment bars
         "sent_bars": [
-            ("Hype",         74, "#BF00FF"),
-            ("Obra Maestra", 68, "#00FF9F"),
-            ("Anticipación", 81, "#00F5FF"),
-            ("Buzz Crítica", 55, "#FF2D78"),
+            ("Hype & Viralidad", 74, "#BF00FF"),
+            ("Aclamación Crítica", 68, "#00FF9F"),
+            ("Anticipación Preventa", 81, "#00F5FF"),
+            ("Buzz en Redes", 55, "#FF2D78"),
         ],
-        # Sentiment chart labels
         "sent_hype":  "Hype",
-        "sent_mast":  "Obra Maestra",
+        "sent_mast":  "Aclamación",
         # Upcoming releases
         "releases": [
             ("Galactic Odyssey 2",  "15 Sep 2026", "#00F5FF", "95%"),
@@ -92,19 +107,35 @@ TRANSLATIONS: dict[str, dict] = {
         # AI Predictions
         "predictions": [
             ("Galactic Odyssey 2",
-             "Proyección abre en $200M+. IMAX agotado en 12 mercados.",
+             "Proyección abre en $200M+. IMAX agotado en 12 mercados clave.",
              "CONF: 91%"),
             ("Campaña Digital MX",
-             "ROI estimado 3.2x. Escalar presupuesto recomendado.",
+             "ROI estimado 3.8x. Recomendada escalación de presupuesto.",
              "CONF: 87%"),
-            ("Alerta Sentiment Drop",
-             "La Mansión: riesgo de caída post-premiere. Monitorear.",
+            ("Alerta de Sostenibilidad",
+             "La Mansión: riesgo de caída post-premiere (-58%). Reforzar social ads.",
              "CONF: 78%"),
         ],
-        # Badges
-        "badge_wknd":  "▲ 22% vs Ú4S",
+        "badge_wknd":  "▲ 22% vs Media",
         "best_week":   "Sem 3: $312M · Mejor semana del trimestre",
         "live_pct":    "▲ 8% EN VIVO",
+        # Simulator
+        "sim_title":       "🎮 SIMULADOR DE LANZAMIENTOS & IMPACTO DE MARKETING",
+        "sim_desc":        "Modela variables clave de marketing y exhibición para predecir la recaudación del fin de semana de apertura (Opening Weekend) y el ROI.",
+        "sim_budget_dig":  "Presupuesto Marketing Digital (€M)",
+        "sim_budget_tv":   "Presupuesto Marketing TV (€M)",
+        "sim_imax_share":  "Asignación de Pantallas IMAX / PLF (%)",
+        "sim_release_win": "Ventana de Exclusividad en Cines (Días)",
+        "sim_genre_sel":   "Género Principal",
+        "sim_proj_open":   "RECAUDACIÓN ESTIMADA OPENING",
+        "sim_proj_roi":    "ROI DE MARKETING ESPERADO",
+        "sim_imax_boost":  "IMPACTO PREMIUM IMAX",
+        "sim_decay_curve": "📈 CURVA DE DECAIMIENTO PROYECTADA (5 SEMANAS)",
+        # News Radar
+        "news_title":      "📰 RADAR DE NOTICIAS DE LA INDUSTRIA & ANÁLISIS DE IMPACTO IA",
+        "news_desc":       "Monitor en tiempo real de eventos de Hollywood, exhibición y distribución con evaluación de impacto financiero generada por Gemini.",
+        "news_btn_analyze":"⚡ Analizar Impacto con Gemini",
+        "news_impact_tag": "EVALUACIÓN DE IMPACTO:",
         # AI Chat tab
         "chat_title":       "🤖 GEMINI AI ANALYST · CONSULTA EN LENGUAJE NATURAL",
         "ch_toggle":        "ClickHouse Real",
@@ -118,24 +149,34 @@ TRANSLATIONS: dict[str, dict] = {
         "data_expand":      "📊 DATOS · Resultado ClickHouse",
         "sql_expand":       "🔍 SQL GENERADO POR GEMINI",
         "mcp_tool":         "Herramienta MCP",
-        "sdk_caption":      "Gemini genera SQL automáticamente · MCP ClickHouse · google-genai SDK",
+        "sdk_caption":      "Gemini genera SQL automáticamente · Protocolo MCP ClickHouse · Google GenAI SDK",
         "examples": [
             "¿Cuántas entradas se vendieron en España?",
-            "¿Top 5 películas por taquilla?",
             "¿Qué formato genera más ingresos: IMAX o 3D?",
             "¿ROI de campañas digitales vs TV?",
+            "¿Top 5 películas por recaudación?",
             "¿Público objetivo 18-34 por mercado?",
         ],
     },
     "EN": {
         # Header
-        "sys_subtitle":   "BOX OFFICE INTELLIGENCE SYSTEM · v2.0",
+        "sys_subtitle":   "BOX OFFICE & MARKETING INTELLIGENCE SYSTEM · v2.5",
         "live_label":     "LIVE",
         "mode_demo":      "DEMO MODE",
         "mode_live":      "CLICKHOUSE LIVE",
         # Tabs
         "tab_dashboard":  "📊  DASHBOARD",
+        "tab_simulator":  "🎮  WHAT-IF SIMULATOR",
+        "tab_news":       "📰  NEWS & RADAR",
         "tab_ai":         "🤖  AI ANALYST",
+        # Quick Filters
+        "flt_genre":      "Genre",
+        "flt_territory":  "Territory",
+        "flt_period":     "Period",
+        "all_genres":     ["All Genres", "Sci-Fi / Fiction", "Action & Adventure", "Drama", "Horror / Thriller", "Animation"],
+        "all_territories":["Global", "North America (US/CA)", "Europe (EU)", "Asia-Pacific", "Latin America"],
+        "all_periods":    ["Current Quarter (Q3)", "Last 12 Months", "Q4 Forecast", "Historical 2025-2026"],
+        "btn_export_brief": "📄 Export Executive Briefing",
         # KPI strip
         "kpi_box_office": "🌍 Global Box Office",
         "kpi_tickets":    "🎟️ Tickets Q3",
@@ -143,10 +184,10 @@ TRANSLATIONS: dict[str, dict] = {
         "kpi_films":      "🎞️ Active Films",
         "kpi_viewers":    "👁️ Live Viewers",
         # Card titles
-        "c_box_office":   "📈 GLOBAL BOX OFFICE · WEEKEND GROSS",
+        "c_box_office":   "📈 GLOBAL BOX OFFICE · WEEKLY TREND",
         "c_engagement":   "🎯 AUDIENCE ENGAGEMENT",
         "c_sat_score":    "SATISFACTION SCORE",
-        "c_demo":         "👥 DEMOGRAPHICS",
+        "c_demo":         "👥 DEMOGRAPHICS & AUDIENCE",
         "c_traffic":      "👁️ REAL-TIME TRAFFIC",
         "c_viewers":      "Current Viewers",
         "c_markets":      "MARKETS",
@@ -157,23 +198,22 @@ TRANSLATIONS: dict[str, dict] = {
         "c_positive":     "POSITIVE 74%",
         "c_predict":      "🤖 AI PREDICTIONS",
         # Chart labels
-        "weeks":         ["Wk 1","Wk 2","Wk 3","Wk 4","Wk 5"],
-        "weeks_eng":     ["Wk 1","Wk 2","Wk 3","Wk 4","Wk 5","Wk 6","Wk 7","Wk 8","Wk 9","Wk 10","Wk 11","Wk 12"],
-        "annot_peak":    "▲ 22%  Wk 3: $312M",
-        "donut_center":  "88%\nSCORE",
-        "hover_ticket":  "Wk %{x}: %{y}%",
-        # Regional card numbers
+        "weeks":          ["Wk 1", "Wk 2", "Wk 3", "Wk 4", "Wk 5"],
+        "weeks_eng":      ["Wk 1", "Wk 2", "Wk 3", "Wk 4", "Wk 5", "Wk 6", "Wk 7", "Wk 8", "Wk 9", "Wk 10", "Wk 11", "Wk 12"],
+        "annot_peak":     "▲ 22%  Wk 3 Peak",
+        "donut_center":   "88%\nSCORE",
+        "hover_ticket":   "Wk %{x}: %{y}%",
+        # Regional numbers
         "reg_asia": "$620M", "reg_us": "$450M", "reg_eu": "$380M",
         # Sentiment bars
         "sent_bars": [
-            ("Hype",         74, "#BF00FF"),
-            ("Masterpiece",  68, "#00FF9F"),
-            ("Anticipation", 81, "#00F5FF"),
-            ("Review Buzz",  55, "#FF2D78"),
+            ("Hype & Virality", 74, "#BF00FF"),
+            ("Critical Acclaim", 68, "#00FF9F"),
+            ("Presale Anticipation", 81, "#00F5FF"),
+            ("Social Buzz", 55, "#FF2D78"),
         ],
-        # Sentiment chart labels
         "sent_hype":  "Hype",
-        "sent_mast":  "Masterpiece",
+        "sent_mast":  "Acclaim",
         # Upcoming releases
         "releases": [
             ("Galactic Odyssey 2",  "Sep 15, 2026", "#00F5FF", "95%"),
@@ -184,19 +224,35 @@ TRANSLATIONS: dict[str, dict] = {
         # AI Predictions
         "predictions": [
             ("Galactic Odyssey 2",
-             "Projected opening $200M+. IMAX sold out in 12 markets.",
+             "Opening projected $200M+. IMAX sold out in 12 key markets.",
              "CONF: 91%"),
             ("Digital Campaign MX",
-             "Estimated ROI 3.2x. Scaling budget recommended.",
+             "Projected ROI 3.8x. Recommended budget expansion.",
              "CONF: 87%"),
-            ("Sentiment Drop Alert",
-             "La Mansión: post-premiere drop risk. Monitor closely.",
+            ("Sustainability Alert",
+             "La Mansión: high post-premiere drop risk (-58%). Boost social ads.",
              "CONF: 78%"),
         ],
-        # Badges
-        "badge_wknd":  "▲ 22% vs L4W",
+        "badge_wknd":  "▲ 22% vs Avg",
         "best_week":   "Wk 3: $312M · Best week of the quarter",
         "live_pct":    "▲ 8% LIVE",
+        # Simulator
+        "sim_title":       "🎮 BOX OFFICE & MARKETING WHAT-IF SIMULATOR",
+        "sim_desc":        "Model key marketing spend and exhibition variables to forecast opening weekend gross and promotional ROI in real time.",
+        "sim_budget_dig":  "Digital Marketing Budget ($M)",
+        "sim_budget_tv":   "TV Marketing Budget ($M)",
+        "sim_imax_share":  "IMAX / PLF Screen Allocation (%)",
+        "sim_release_win": "Theatrical Exclusivity Window (Days)",
+        "sim_genre_sel":   "Primary Film Genre",
+        "sim_proj_open":   "ESTIMATED OPENING WEEKEND",
+        "sim_proj_roi":    "EXPECTED CAMPAIGN ROI",
+        "sim_imax_boost":  "PREMIUM FORMAT BOOST",
+        "sim_decay_curve": "📈 5-WEEK PROJECTED DECAY CURVE",
+        # News Radar
+        "news_title":      "📰 INDUSTRY NEWS RADAR & AI IMPACT ASSESSMENT",
+        "news_desc":       "Real-time tracking of Hollywood events, exhibition trends, and studio announcements with financial impact analyses by Gemini.",
+        "news_btn_analyze":"⚡ Analyze Impact with Gemini",
+        "news_impact_tag": "AI IMPACT ASSESSMENT:",
         # AI Chat tab
         "chat_title":       "🤖 GEMINI AI ANALYST · NATURAL LANGUAGE QUERY",
         "ch_toggle":        "Real ClickHouse",
@@ -210,19 +266,19 @@ TRANSLATIONS: dict[str, dict] = {
         "data_expand":      "📊 DATA · ClickHouse Result",
         "sql_expand":       "🔍 SQL GENERATED BY GEMINI",
         "mcp_tool":         "MCP Tool",
-        "sdk_caption":      "Gemini auto-generates SQL · MCP ClickHouse · google-genai SDK",
+        "sdk_caption":      "Gemini auto-generates SQL · ClickHouse MCP Protocol · Google GenAI SDK",
         "examples": [
             "How many tickets were sold in Spain?",
-            "Top 5 films by box office?",
-            "Which format earns more: IMAX or 3D?",
+            "Which format earns more revenue: IMAX or 3D?",
             "ROI of digital campaigns vs TV?",
+            "Top 5 films by box office gross?",
             "Target audience 18-34 by market?",
         ],
     },
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CSS
+# CSS · NEON HOLOGRAPHIC THEME
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -234,6 +290,7 @@ st.markdown("""
     --neon-pink:    #FF2D78;
     --neon-green:   #00FF9F;
     --neon-blue:    #0066FF;
+    --neon-gold:    #FFD700;
     --bg-deep:      #020813;
     --bg-card:      #060D1F;
     --bg-card2:     #080E20;
@@ -254,7 +311,7 @@ html, body, .stApp {
 }
 #MainMenu,footer,header,[data-testid="stToolbar"],[data-testid="stDecoration"]{display:none!important}
 [data-testid="stSidebar"]{display:none!important}
-.block-container{padding:1rem 1.5rem 2rem!important;max-width:100%!important}
+.block-container{padding:0.8rem 1.5rem 2rem!important;max-width:100%!important}
 
 /* Scanline */
 .stApp::before{
@@ -280,25 +337,10 @@ html, body, .stApp {
 }
 .hud-title span{color:var(--neon-cyan);}
 .hud-subtitle{font-family:var(--font-hud);font-size:.5rem;color:#2A4A6A;letter-spacing:.1em;margin:3px 0 0;}
-.hud-meta{font-family:var(--font-hud);font-size:.62rem;color:var(--text-dim);letter-spacing:.1em;text-align:right;line-height:1.7;}
-.hud-meta strong{color:var(--neon-cyan);}
 .hud-dot{width:7px;height:7px;border-radius:50%;background:var(--neon-green);
     box-shadow:0 0 8px var(--neon-green),0 0 20px var(--neon-green);
     display:inline-block;margin-right:5px;animation:blink 2s infinite;}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-
-/* Lang switcher */
-.lang-btn-row{display:flex;gap:6px;align-items:center;margin-left:20px;}
-.lang-pill{
-    font-family:var(--font-hud);font-size:.6rem;letter-spacing:.1em;
-    padding:4px 10px;border-radius:3px;cursor:pointer;border:1px solid;
-    transition:all .2s;text-decoration:none;
-}
-.lang-active{
-    background:rgba(0,245,255,.15);color:var(--neon-cyan);
-    border-color:var(--neon-cyan);box-shadow:0 0 8px rgba(0,245,255,.3);
-}
-.lang-inactive{background:transparent;color:var(--text-dim);border-color:rgba(255,255,255,.1);}
 
 /* Tabs */
 .stTabs [data-baseweb="tab-list"]{
@@ -309,7 +351,7 @@ html, body, .stApp {
 .stTabs [data-baseweb="tab"]{
     font-family:var(--font-hud)!important;font-size:.68rem!important;
     letter-spacing:.12em!important;color:var(--text-dim)!important;
-    padding:10px 22px!important;border:none!important;background:transparent!important;
+    padding:10px 18px!important;border:none!important;background:transparent!important;
     border-bottom:2px solid transparent!important;transition:all .2s!important;
 }
 .stTabs [aria-selected="true"]{
@@ -318,10 +360,17 @@ html, body, .stApp {
 }
 .stTabs [data-baseweb="tab-panel"]{background:transparent!important;padding:0!important;}
 
-/* Neon card */
+/* Filter Bar */
+.filter-bar{
+    display:flex;gap:12px;align-items:center;padding:10px 14px;
+    background:rgba(0,245,255,0.03);border:1px solid var(--border-dim);
+    border-radius:4px;margin-bottom:12px;
+}
+
+/* Neon Cards */
 .neon-card{
     background:var(--bg-card);border:1px solid var(--border-dim);
-    border-radius:6px;padding:16px;position:relative;overflow:hidden;
+    border-radius:6px;padding:14px;position:relative;overflow:hidden;
     box-shadow:0 0 20px rgba(0,245,255,.04),inset 0 1px 0 rgba(0,245,255,.12);
     margin-bottom:12px;
 }
@@ -332,6 +381,7 @@ html, body, .stApp {
 .neon-card.purple::before{background:linear-gradient(90deg,transparent,var(--neon-purple),transparent);}
 .neon-card.pink::before{background:linear-gradient(90deg,transparent,var(--neon-pink),transparent);}
 .neon-card.green::before{background:linear-gradient(90deg,transparent,var(--neon-green),transparent);}
+.neon-card.gold::before{background:linear-gradient(90deg,transparent,var(--neon-gold),transparent);}
 
 /* Card title */
 .card-title{font-family:var(--font-hud);font-size:.65rem;letter-spacing:.14em;
@@ -340,15 +390,18 @@ html, body, .stApp {
 .card-title.purple{color:var(--neon-purple);text-shadow:0 0 6px var(--neon-purple);}
 .card-title.pink  {color:var(--neon-pink);  text-shadow:0 0 6px var(--neon-pink);}
 .card-title.green {color:var(--neon-green); text-shadow:0 0 6px var(--neon-green);}
+.card-title.gold  {color:var(--neon-gold);  text-shadow:0 0 6px var(--neon-gold);}
 
 /* Big metric */
 .big-metric{
-    font-family:var(--font-hud);font-size:2.4rem;font-weight:900;line-height:1;
+    font-family:var(--font-hud);font-size:2.3rem;font-weight:900;line-height:1;
     color:var(--neon-cyan);text-shadow:0 0 20px var(--neon-cyan),0 0 50px rgba(0,245,255,.4);
     margin:8px 0 4px;
 }
 .big-metric.purple{color:var(--neon-purple);text-shadow:0 0 20px var(--neon-purple),0 0 50px rgba(191,0,255,.4);}
 .big-metric.green {color:var(--neon-green); text-shadow:0 0 20px var(--neon-green), 0 0 50px rgba(0,255,159,.4);}
+.big-metric.pink  {color:var(--neon-pink);  text-shadow:0 0 20px var(--neon-pink), 0 0 50px rgba(255,45,120,.4);}
+.big-metric.gold  {color:var(--neon-gold);  text-shadow:0 0 20px var(--neon-gold), 0 0 50px rgba(255,215,0,.4);}
 .metric-sub{font-family:var(--font-body);font-size:.77rem;color:var(--text-dim);letter-spacing:.05em;}
 .metric-badge{display:inline-block;padding:2px 8px;border-radius:3px;
     font-family:var(--font-hud);font-size:.58rem;font-weight:700;letter-spacing:.1em;}
@@ -370,19 +423,20 @@ html, body, .stApp {
 .release-score{margin-left:auto;font-family:var(--font-hud);font-size:.68rem;font-weight:700;
     padding:2px 7px;border-radius:3px;white-space:nowrap;}
 
-/* Predictions */
-.prediction-item{padding:8px 10px;border-left:2px solid var(--neon-purple);margin-bottom:6px;
-    background:rgba(191,0,255,.05);border-radius:0 4px 4px 0;}
-.prediction-title{font-size:.79rem;font-weight:600;color:var(--text-bright);}
-.prediction-desc{font-size:.67rem;color:var(--text-dim);margin-top:2px;}
-.prediction-conf{font-family:var(--font-hud);font-size:.63rem;color:var(--neon-purple);margin-top:4px;}
-
-/* Sentiment bars */
-.sentiment-bar-wrap{margin:6px 0;}
-.sentiment-label{display:flex;justify-content:space-between;font-size:.7rem;margin-bottom:3px;color:var(--text-dim);}
-.sentiment-label span:last-child{color:var(--neon-cyan);font-family:var(--font-hud);}
-.sentiment-bar-bg{background:rgba(0,245,255,.08);border-radius:2px;height:5px;overflow:hidden;}
-.sentiment-bar-fill{height:100%;border-radius:2px;}
+/* News Cards */
+.news-card{
+    background:var(--bg-card2);border:1px solid var(--border-dim);
+    border-radius:6px;padding:14px;margin-bottom:12px;transition:all 0.2s;
+}
+.news-card:hover{border-color:var(--neon-cyan);box-shadow:0 0 15px rgba(0,245,255,.1);}
+.news-source{font-family:var(--font-hud);font-size:.6rem;color:var(--neon-cyan);letter-spacing:.1em;}
+.news-headline{font-size:.92rem;font-weight:700;color:var(--text-bright);margin:4px 0;}
+.news-summary{font-size:.78rem;color:var(--text-dim);line-height:1.5;}
+.news-impact-box{
+    margin-top:10px;padding:10px 12px;background:rgba(191,0,255,.06);
+    border-left:2px solid var(--neon-purple);border-radius:0 4px 4px 0;
+    font-size:.78rem;color:#D8B4FE;
+}
 
 /* Chat */
 .chat-user{
@@ -397,14 +451,13 @@ html, body, .stApp {
     box-shadow:0 0 20px rgba(0,245,255,.04);
 }
 
-/* Inputs */
+/* Form Inputs & Sliders */
+.stSlider > div > div > div > div { background-color: var(--neon-cyan) !important; }
+.stSelectbox > div > div { background-color: rgba(0,13,30,.9) !important; border-color: var(--border-dim) !important; }
 .stTextInput>div>div>input{
     background:rgba(0,13,30,.9)!important;border:1px solid var(--border-dim)!important;
     border-radius:4px!important;color:var(--text-bright)!important;
     font-family:var(--font-body)!important;font-size:.95rem!important;
-}
-.stTextInput>div>div>input:focus{
-    border-color:var(--neon-cyan)!important;box-shadow:0 0 12px rgba(0,245,255,.2)!important;
 }
 .stButton>button{
     background:linear-gradient(135deg,rgba(0,245,255,.15),rgba(191,0,255,.15))!important;
@@ -412,15 +465,10 @@ html, body, .stApp {
     font-family:var(--font-hud)!important;font-size:.68rem!important;letter-spacing:.1em!important;
     border-radius:4px!important;transition:all .2s!important;
 }
-.stButton>button:hover{background:rgba(0,245,255,.2)!important;box-shadow:0 0 15px rgba(0,245,255,.3)!important;}
-
-/* Misc */
+.stButton>button:hover{background:rgba(0,245,255,.25)!important;box-shadow:0 0 15px rgba(0,245,255,.3)!important;}
 [data-testid="stDataFrame"]{border-radius:6px;overflow:hidden;}
 [data-testid="stExpander"]{background:var(--bg-card2)!important;border:1px solid var(--border-dim)!important;border-radius:4px!important;}
 .stSpinner>div{border-top-color:var(--neon-cyan)!important;}
-::-webkit-scrollbar{width:4px;height:4px;}
-::-webkit-scrollbar-track{background:var(--bg-deep);}
-::-webkit-scrollbar-thumb{background:rgba(0,245,255,.3);border-radius:2px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -469,19 +517,20 @@ def init_session():
         "use_mock":      True,
         "total_queries": 0,
         "session_start": datetime.now().strftime("%H:%M"),
-        "lang":          "ES",   # ← idioma activo
+        "lang":          "ES",
+        "filter_genre":  "Todos los Géneros",
+        "filter_region": "Global",
+        "news_analysis": {},
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
 init_session()
-
-# Shortcut cómodo al diccionario del idioma activo
 t = TRANSLATIONS[st.session_state.lang]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CHART HELPERS  (reciben `t` para textos traducidos)
+# CHART HELPERS (PLOTLY NEON)
 # ─────────────────────────────────────────────────────────────────────────────
 PLOTLY_BASE = dict(
     plot_bgcolor="rgba(0,0,0,0)",
@@ -502,26 +551,22 @@ PLOTLY_BASE = dict(
     ),
 )
 CHART_CFG = {"displayModeBar": False, "responsive": True}
-
-_Y_BASE = dict(
-    gridcolor="rgba(0,245,255,0.06)",
-    zerolinecolor="rgba(0,245,255,0.1)",
-    tickfont=dict(color="#5A7A9A", size=9),
-)
+_Y_BASE = dict(gridcolor="rgba(0,245,255,0.06)", zerolinecolor="rgba(0,245,255,0.1)", tickfont=dict(color="#5A7A9A", size=9))
 
 
-def chart_box_office(t: dict) -> go.Figure:
-    gross = [148, 221, 312, 278, 355]
+def chart_box_office(t: dict, multiplier: float = 1.0) -> go.Figure:
+    base_gross = [148, 221, 312, 278, 355]
+    gross = [round(v * multiplier, 1) for v in base_gross]
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=t["weeks"], y=gross, mode="lines+markers",
         fill="tozeroy", fillcolor="rgba(0,245,255,0.07)",
         line=dict(color="#00F5FF", width=2.5, shape="spline"),
         marker=dict(color="#00F5FF", size=6, line=dict(color="#001A2E", width=2)),
-        name="Box Office", hovertemplate="%{y}M€<extra></extra>",
+        name="Box Office", hovertemplate="%{y}M$<extra></extra>",
     ))
     fig.add_annotation(
-        x=t["weeks"][2], y=312, text=t["annot_peak"],
+        x=t["weeks"][2], y=gross[2], text=f"{t['annot_peak']}: ${gross[2]}M",
         font=dict(color="#00FF9F", size=9, family="Orbitron"),
         showarrow=False, yshift=14,
         bgcolor="rgba(0,255,159,0.12)", bordercolor="rgba(0,255,159,0.4)",
@@ -530,14 +575,14 @@ def chart_box_office(t: dict) -> go.Figure:
     fig.update_layout(**PLOTLY_BASE)
     fig.update_layout(
         height=170,
-        yaxis=dict(**_Y_BASE, tickprefix="$", ticksuffix="M", range=[0, 420]),
+        yaxis=dict(**_Y_BASE, tickprefix="$", ticksuffix="M", range=[0, max(gross) * 1.35]),
     )
     return fig
 
 
-def chart_regional(t: dict) -> go.Figure:
+def chart_regional(t: dict, multiplier: float = 1.0) -> go.Figure:
     regions = ["US", "EU", "ASIA", "LATAM", "MEA"]
-    values  = [450, 380, 620, 195, 142]
+    values  = [round(450 * multiplier), round(380 * multiplier), round(620 * multiplier), round(195 * multiplier), round(142 * multiplier)]
     colors  = ["#00F5FF", "#BF00FF", "#FF2D78", "#00FF9F", "#0066FF"]
     fig = go.Figure()
     for r, v, c in zip(regions, values, colors):
@@ -561,8 +606,7 @@ def chart_demographics(t: dict) -> go.Figure:
     fig = go.Figure(go.Pie(
         labels=["18-34", "35-49", "50+"],
         values=[45, 30, 25], hole=0.62,
-        marker=dict(colors=["#00F5FF", "#BF00FF", "#FF2D78"],
-                    line=dict(color="#020813", width=3)),
+        marker=dict(colors=["#00F5FF", "#BF00FF", "#FF2D78"], line=dict(color="#020813", width=3)),
         textfont=dict(size=9, color="#5A7A9A"),
         hovertemplate="%{label}: %{value}%<extra></extra>",
     ))
@@ -623,34 +667,58 @@ def chart_sentiment(t: dict) -> go.Figure:
     return fig
 
 
+def chart_simulator_decay(opening_m: float) -> go.Figure:
+    weeks = ["Wk 1 (Opening)", "Wk 2", "Wk 3", "Wk 4", "Wk 5"]
+    # Standard blockbuster drop: -50%, -40%, -35%, -30%
+    gross = [
+        round(opening_m, 1),
+        round(opening_m * 0.52, 1),
+        round(opening_m * 0.31, 1),
+        round(opening_m * 0.19, 1),
+        round(opening_m * 0.12, 1),
+    ]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=weeks, y=gross, mode="lines+markers+text",
+        text=[f"${g}M" for g in gross], textposition="top center",
+        textfont=dict(family="Orbitron", size=10, color="#00F5FF"),
+        line=dict(color="#00F5FF", width=3, shape="spline"),
+        fill="tozeroy", fillcolor="rgba(0,245,255,0.08)",
+        marker=dict(size=8, color="#BF00FF", line=dict(color="#00F5FF", width=2)),
+        hovertemplate="%{x}: $%{y}M<extra></extra>",
+    ))
+    fig.update_layout(**PLOTLY_BASE)
+    fig.update_layout(
+        height=220,
+        yaxis=dict(**_Y_BASE, tickprefix="$", ticksuffix="M", range=[0, max(gross) * 1.35]),
+    )
+    return fig
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# HEADER  (con language switcher)
+# HEADER & LANGUAGE SWITCHER
 # ─────────────────────────────────────────────────────────────────────────────
 now = datetime.now()
 mode_lbl = t["mode_demo"] if st.session_state.use_mock else t["mode_live"]
 
-# Renderizar header con columnas: título | lang switcher | meta
-hdr_left, hdr_lang, hdr_right = st.columns([4, 1, 2])
+hdr_left, hdr_lang, hdr_right = st.columns([4.2, 1.2, 1.8])
 
 with hdr_left:
     st.markdown(f"""
-    <div style="padding:12px 0 8px;">
+    <div style="padding:10px 0 6px;">
         <p class="hud-title">🎬 <span>CINE</span>METRICS · AI</p>
         <p class="hud-subtitle">{t["sys_subtitle"]}</p>
     </div>
     """, unsafe_allow_html=True)
 
 with hdr_lang:
-    # Botones de idioma
-    st.markdown("<div style='padding-top:14px;'>", unsafe_allow_html=True)
-    lang_col1, lang_col2 = st.columns(2)
-    with lang_col1:
-        es_style = "background:rgba(0,245,255,.15);border-color:#00F5FF;" if st.session_state.lang == "ES" else ""
+    st.markdown("<div style='padding-top:12px;'>", unsafe_allow_html=True)
+    l1, l2 = st.columns(2)
+    with l1:
         if st.button("🇪🇸 ES", key="btn_es", use_container_width=True):
             st.session_state.lang = "ES"
             st.rerun()
-    with lang_col2:
-        en_style = "background:rgba(0,245,255,.15);border-color:#00F5FF;" if st.session_state.lang == "EN" else ""
+    with l2:
         if st.button("🇬🇧 EN", key="btn_en", use_container_width=True):
             st.session_state.lang = "EN"
             st.rerun()
@@ -658,22 +726,26 @@ with hdr_lang:
 
 with hdr_right:
     st.markdown(f"""
-    <div style="text-align:right;padding:12px 0 8px;
+    <div style="text-align:right;padding:10px 0 6px;
                 font-family:'Orbitron',monospace;font-size:.6rem;
-                color:#5A7A9A;letter-spacing:.1em;line-height:1.8;">
+                color:#5A7A9A;letter-spacing:.1em;line-height:1.7;">
         <span class="hud-dot"></span><strong style="color:#00F5FF">{t["live_label"]}</strong><br>
         {now.strftime('%Y-%m-%d · %H:%M:%S')}<br>
         {mode_lbl}
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("<div style='border-top:1px solid rgba(0,245,255,.15);margin-bottom:10px;'></div>",
-            unsafe_allow_html=True)
+st.markdown("<div style='border-top:1px solid rgba(0,245,255,.15);margin-bottom:8px;'></div>", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TABS
 # ─────────────────────────────────────────────────────────────────────────────
-tab_dash, tab_ai = st.tabs([t["tab_dashboard"], t["tab_ai"]])
+tab_dash, tab_sim, tab_news, tab_ai = st.tabs([
+    t["tab_dashboard"],
+    t["tab_simulator"],
+    t["tab_news"],
+    t["tab_ai"],
+])
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -681,15 +753,66 @@ tab_dash, tab_ai = st.tabs([t["tab_dashboard"], t["tab_ai"]])
 # ═════════════════════════════════════════════════════════════════════════════
 with tab_dash:
 
-    # ── KPI STRIP ─────────────────────────────────────────────────────────
+    # ── FILTROS GLOBALES INTERACTIVOS ──────────────────────────────────────
+    f1, f2, f3, f4 = st.columns([1.5, 1.5, 1.5, 1.5])
+    with f1:
+        sel_genre = st.selectbox("🎬 " + t["flt_genre"], t["all_genres"], key="sb_genre")
+    with f2:
+        sel_terr = st.selectbox("🌍 " + t["flt_territory"], t["all_territories"], key="sb_terr")
+    with f3:
+        sel_period = st.selectbox("📅 " + t["flt_period"], t["all_periods"], key="sb_period")
+    with f4:
+        st.markdown("<div style='padding-top:28px;'>", unsafe_allow_html=True)
+        if st.button("📥 " + t["btn_export_brief"], use_container_width=True):
+            st.session_state["show_briefing_modal"] = True
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # Multiplicador dinámico basado en filtros para interactividad viva
+    genre_mult = 1.35 if "Sci-Fi" in sel_genre else (1.2 if "Acción" in sel_genre or "Action" in sel_genre else 1.0)
+    terr_mult = 0.6 if "Europe" in sel_terr or "Europa" in sel_terr else (0.75 if "Asia" in sel_terr else 1.0)
+    dyn_mult = round(genre_mult * terr_mult, 2)
+
+    # ── MODAL / EXPANDER DE BRIEFING EJECUTIVO ─────────────────────────────
+    if st.session_state.get("show_briefing_modal", False):
+        with st.expander("📄 EXECUTIVE BRIEFING · Q3 STRATEGY REPORT", expanded=True):
+            briefing_text = f"""### 🎬 CINEMETRICS AI · EXECUTIVE STRATEGY BRIEFING
+**Fecha de Emisión:** {now.strftime('%d/%m/%Y %H:%M')} | **Filtro Aplicado:** {sel_genre} · {sel_terr} · {sel_period}
+
+---
+#### 1. Resumen Ejecutivo de Rendimiento
+* **Recaudación Global Acumulada:** ${round(1.85 * dyn_mult, 2)}B (+22% vs trimestre anterior).
+* **Entradas Vendidas:** {round(18.4 * dyn_mult, 1)}M tickets en 47 territorios activos.
+* **Índice de Satisfacción (CSAT):** 88% (Score de alta retención).
+
+#### 2. Hallazgos Clave de Exhibición
+* **Dominancia Premium:** El formato **IMAX / PLF** genera una prima de recaudación del **+41.4%** respecto a salas estándar.
+* **Retorno Publicitario:** Las campañas en **Marketing Digital** superan a la TV tradicional con un **ROI de 3.80x vs 2.20x**.
+* **Territorios Líderes:** México, España y EE.UU. concentran el 68% de las reservas anticipadas en preventa.
+
+#### 3. Recomendaciones Estratégicas para la Junta
+1. **Reasignar 25% del gasto publicitario** de televisión lineal hacia campañas programáticas en redes sociales y streaming.
+2. **Ampliar contratos de permanencia en pantallas IMAX** para el fin de semana 2 y 3 en títulos de ciencia ficción y acción.
+"""
+            st.markdown(briefing_text)
+            st.download_button(
+                "💾 Descargar Briefing (.md)",
+                data=briefing_text,
+                file_name=f"CineMetrics_Executive_Briefing_{now.strftime('%Y%m%d')}.md",
+                mime="text/markdown",
+            )
+
+    # ── KPI STRIP DINÁMICO ─────────────────────────────────────────────────
+    box_office_val = f"${round(1.85 * dyn_mult, 2)}B"
+    tickets_val = f"{round(18.4 * dyn_mult, 1)}M"
+
     st.markdown(f"""
     <div class="mini-kpi-row">
         <div class="mini-kpi">
-            <span class="mini-kpi-val">$1.85B</span>
+            <span class="mini-kpi-val">{box_office_val}</span>
             <span class="mini-kpi-lbl">{t["kpi_box_office"]}</span>
         </div>
         <div class="mini-kpi" style="border-color:rgba(191,0,255,.3);">
-            <span class="mini-kpi-val" style="color:#BF00FF;text-shadow:0 0 8px #BF00FF;">18.4M</span>
+            <span class="mini-kpi-val" style="color:#BF00FF;text-shadow:0 0 8px #BF00FF;">{tickets_val}</span>
             <span class="mini-kpi-lbl">{t["kpi_tickets"]}</span>
         </div>
         <div class="mini-kpi" style="border-color:rgba(0,255,159,.3);">
@@ -715,13 +838,13 @@ with tab_dash:
         <div class="neon-card" style="margin-bottom:0">
             <div class="card-title cyan">{t["c_box_office"]}</div>
             <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
-                <span class="big-metric" style="font-size:1.8rem;">$1.85B</span>
+                <span class="big-metric" style="font-size:1.8rem;">{box_office_val}</span>
                 <span class="metric-badge badge-up">{t["badge_wknd"]}</span>
             </div>
-            <div class="metric-sub">{t["best_week"]}</div>
+            <div class="metric-sub">{t["best_week"]} ({sel_genre})</div>
         </div>
         """, unsafe_allow_html=True)
-        st.plotly_chart(chart_box_office(t), use_container_width=True, config=CHART_CFG)
+        st.plotly_chart(chart_box_office(t, dyn_mult), use_container_width=True, config=CHART_CFG)
 
     with c2:
         st.markdown(f"""
@@ -731,13 +854,13 @@ with tab_dash:
                 <span class="big-metric purple" style="font-size:1.5rem;">88%</span>
                 <span class="metric-badge badge-up">{t["c_sat_score"]}</span>
             </div>
-            <div class="metric-sub">↑ 3pts</div>
+            <div class="metric-sub">↑ 3pts vs mes anterior</div>
         </div>
         """, unsafe_allow_html=True)
         st.plotly_chart(chart_engagement(t), use_container_width=True, config=CHART_CFG)
 
         st.markdown(f"""
-        <div class="neon-card" style="margin-bottom:0;padding:12px 16px;">
+        <div class="neon-card" style="margin-bottom:0;padding:10px 14px;">
             <div class="card-title">{t["c_demo"]}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -745,23 +868,21 @@ with tab_dash:
 
     with c3:
         st.markdown(f"""
-        <div class="neon-card green" style="margin-bottom:6px;text-align:center;padding:18px;">
+        <div class="neon-card green" style="margin-bottom:6px;text-align:center;padding:16px;">
             <div class="card-title green">{t["c_traffic"]}</div>
-            <div class="big-metric green" style="font-size:2.2rem;">21,450</div>
+            <div class="big-metric green" style="font-size:2.1rem;">21,450</div>
             <div class="metric-sub">{t["c_viewers"]}</div>
-            <div style="margin-top:10px;">
+            <div style="margin-top:8px;">
                 <span class="metric-badge badge-up">{t["live_pct"]}</span>
             </div>
-            <div style="height:1px;background:rgba(0,255,159,.15);margin:12px 0;"></div>
+            <div style="height:1px;background:rgba(0,255,159,.15);margin:10px 0;"></div>
             <div style="display:flex;justify-content:space-around;">
                 <div>
-                    <div style="font-family:'Orbitron',monospace;font-size:.9rem;
-                                color:#00FF9F;text-shadow:0 0 6px #00FF9F;">47</div>
+                    <div style="font-family:'Orbitron',monospace;font-size:.85rem;color:#00FF9F;">47</div>
                     <div style="font-size:.6rem;color:#5A7A9A;">{t["c_markets"]}</div>
                 </div>
                 <div>
-                    <div style="font-family:'Orbitron',monospace;font-size:.9rem;
-                                color:#00F5FF;text-shadow:0 0 6px #00F5FF;">3.2s</div>
+                    <div style="font-family:'Orbitron',monospace;font-size:.85rem;color:#00F5FF;">3.2s</div>
                     <div style="font-size:.6rem;color:#5A7A9A;">{t["c_avg"]}</div>
                 </div>
             </div>
@@ -776,48 +897,47 @@ with tab_dash:
                 <div class="release-title">{title}</div>
                 <div class="release-meta">{date}</div>
             </div>
-            <span class="release-score"
-                  style="background:rgba(0,245,255,.08);color:{c};border:1px solid rgba(0,245,255,.2);">
+            <span class="release-score" style="background:rgba(0,245,255,.08);color:{c};border:1px solid rgba(0,245,255,.2);">
                 {score}
             </span>
         </div>
         """ for title, date, c, score in t["releases"])
 
         st.markdown(f"""
-        <div class="neon-card" style="padding:12px;">
-            <div class="card-title cyan" style="margin-bottom:8px;">{t["c_releases"]}</div>
+        <div class="neon-card" style="padding:10px 12px;">
+            <div class="card-title cyan" style="margin-bottom:6px;">{t["c_releases"]}</div>
             {items_html}
         </div>
         """, unsafe_allow_html=True)
 
     # ── FILA 2 ────────────────────────────────────────────────────────────
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     c4, c5, c6 = st.columns([2.0, 2.2, 1.5])
 
     with c4:
         st.markdown(f"""
         <div class="neon-card pink" style="margin-bottom:0;">
-            <div class="card-title pink">{t["c_regional"]}</div>
+            <div class="card-title pink">{t["c_regional"]} ({sel_terr})</div>
             <div style="display:flex;gap:14px;margin-bottom:4px;">
                 <div>
                     <span style="font-family:'Orbitron',monospace;font-size:.85rem;color:#FF2D78;">
-                        {t["reg_asia"]}</span>
+                        ${round(620 * dyn_mult)}M</span>
                     <span style="font-size:.6rem;color:#5A7A9A;"> ASIA</span>
                 </div>
                 <div>
                     <span style="font-family:'Orbitron',monospace;font-size:.85rem;color:#00F5FF;">
-                        {t["reg_us"]}</span>
+                        ${round(450 * dyn_mult)}M</span>
                     <span style="font-size:.6rem;color:#5A7A9A;"> US</span>
                 </div>
                 <div>
                     <span style="font-family:'Orbitron',monospace;font-size:.85rem;color:#BF00FF;">
-                        {t["reg_eu"]}</span>
+                        ${round(380 * dyn_mult)}M</span>
                     <span style="font-size:.6rem;color:#5A7A9A;"> EU</span>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
-        st.plotly_chart(chart_regional(t), use_container_width=True, config=CHART_CFG)
+        st.plotly_chart(chart_regional(t, dyn_mult), use_container_width=True, config=CHART_CFG)
 
     with c5:
         bars_html = "".join(f"""
@@ -861,7 +981,131 @@ with tab_dash:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# TAB 2 · AI ANALYST CHAT
+# TAB 2 · WHAT-IF SIMULATOR
+# ═════════════════════════════════════════════════════════════════════════════
+with tab_sim:
+    st.markdown(f"""
+    <div style="padding:8px 0 14px;">
+        <div style="font-family:'Orbitron',monospace;font-size:.85rem;color:#00F5FF;letter-spacing:.12em;">
+            {t["sim_title"]}
+        </div>
+        <div style="color:#5A7A9A;font-size:.82rem;margin-top:4px;">
+            {t["sim_desc"]}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    sim_c1, sim_c2 = st.columns([1.6, 2.4])
+
+    with sim_c1:
+        st.markdown('<div class="neon-card gold">', unsafe_allow_html=True)
+        st.markdown(f'<div class="card-title gold">🎛️ {t["sim_title"]}</div>', unsafe_allow_html=True)
+
+        sim_genre = st.selectbox(t["sim_genre_sel"], ["Sci-Fi / Blockbuster", "Acción & Franquicia", "Drama / Autor", "Terror / Suspenso"])
+        sim_digital = st.slider(t["sim_budget_dig"], min_value=1.0, max_value=40.0, value=15.0, step=0.5)
+        sim_tv = st.slider(t["sim_budget_tv"], min_value=1.0, max_value=50.0, value=20.0, step=0.5)
+        sim_imax = st.slider(t["sim_imax_share"], min_value=5, max_value=60, value=30, step=5)
+        sim_window = st.slider(t["sim_release_win"], min_value=30, max_value=120, value=45, step=5)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Cálculo del modelo predictivo en tiempo real
+        # Factor base por género + ROI digital (3.8x) + ROI TV (2.2x) + Boost IMAX
+        genre_base = 45.0 if "Sci-Fi" in sim_genre else (38.0 if "Acción" in sim_genre else 20.0)
+        dig_impact = sim_digital * 3.8
+        tv_impact  = sim_tv * 2.2
+        imax_boost_val = (sim_imax / 100.0) * 0.42
+        total_opening = (genre_base + (dig_impact + tv_impact) * 0.7) * (1.0 + imax_boost_val)
+        total_spend = sim_digital + sim_tv
+        predicted_roi = round(((dig_impact + tv_impact) / total_spend), 2)
+
+    with sim_c2:
+        # Scorecards proyectados
+        st.markdown(f"""
+        <div style="display:flex;gap:10px;margin-bottom:12px;">
+            <div class="neon-card" style="flex:1;text-align:center;padding:16px;">
+                <div class="card-title cyan">{t["sim_proj_open"]}</div>
+                <div class="big-metric" style="font-size:2rem;">${round(total_opening, 1)}M</div>
+                <div class="metric-sub">Opening Weekend Gross</div>
+            </div>
+            <div class="neon-card green" style="flex:1;text-align:center;padding:16px;">
+                <div class="card-title green">{t["sim_proj_roi"]}</div>
+                <div class="big-metric green" style="font-size:2rem;">{predicted_roi}x</div>
+                <div class="metric-sub">Marketing Efficiency Ratio</div>
+            </div>
+            <div class="neon-card purple" style="flex:1;text-align:center;padding:16px;">
+                <div class="card-title purple">{t["sim_imax_boost"]}</div>
+                <div class="big-metric purple" style="font-size:2rem;">+{int(imax_boost_val * 100)}%</div>
+                <div class="metric-sub">PLF Premium Lift</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f'<div class="neon-card"><div class="card-title cyan">{t["sim_decay_curve"]}</div>', unsafe_allow_html=True)
+        st.plotly_chart(chart_simulator_decay(total_opening), use_container_width=True, config=CHART_CFG)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB 3 · INDUSTRY NEWS & RADAR
+# ═════════════════════════════════════════════════════════════════════════════
+with tab_news:
+    st.markdown(f"""
+    <div style="padding:8px 0 14px;">
+        <div style="font-family:'Orbitron',monospace;font-size:.85rem;color:#00F5FF;letter-spacing:.12em;">
+            {t["news_title"]}
+        </div>
+        <div style="color:#5A7A9A;font-size:.82rem;margin-top:4px;">
+            {t["news_desc"]}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    NEWS_ITEMS = [
+        {
+            "id": "news_1",
+            "source": "VARIETY · EXHIBITION RADAR",
+            "headline": "IMAX expande su red global con 120 nuevas salas premium en Asia y Latinoamérica",
+            "date": "Hace 2 horas · Mercado Global",
+            "body": "La compañía de gran formato anuncia acuerdos con cadenas líderes en Japón, Corea y México ante la demanda récord de entradas para franquicias de ciencia ficción.",
+            "default_ai": "📈 **Impacto Proyectado:** +18% en recaudación internacional para blockbusters en Q4. Se recomienda negociar ventanas extendidas de exclusividad PLF de al menos 3 semanas.",
+        },
+        {
+            "id": "news_2",
+            "source": "DEADLINE · MARKETING SHIFT",
+            "headline": "Los estudios de Hollywood reducen un 30% el gasto en TV tradicional en favor de TikTok y streaming ads",
+            "date": "Hace 5 horas · Estrategia",
+            "body": "Nuevos reportes confirman que el costo por adquisición de audiencia juvenil (18-34 años) es 3.2 veces más eficiente en plataformas sociales que en televisión abierta.",
+            "default_ai": "💡 **Acción Sugerida:** Reasignar presupuesto de campañas otoño/invierno hacia micro-influencers de cine y compra programática de video vertical para maximizar el ROI.",
+        },
+        {
+            "id": "news_3",
+            "source": "BOXOFFICE PRO · BOX OFFICE PULSE",
+            "headline": "Las preventas de 'Galactic Odyssey 2' superan los 85M$ en su primera semana",
+            "date": "Ayer · Taquilla",
+            "body": "La secuela espacial apunta a un fin de semana de apertura global superior a los 220M$, impulsada por una retención del 95% en salas de gran formato.",
+            "default_ai": "🎯 **Proyección:** Probabilidad del 91% de superar el récord trimestral de taquilla. Riesgo bajo de canibalización con títulos competidores en su ventana de estreno.",
+        },
+    ]
+
+    for item in NEWS_ITEMS:
+        st.markdown(f"""
+        <div class="news-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span class="news-source">{item["source"]}</span>
+                <span style="font-size:.68rem;color:#5A7A9A;">{item["date"]}</span>
+            </div>
+            <div class="news-headline">{item["headline"]}</div>
+            <div class="news-summary">{item["body"]}</div>
+            <div class="news-impact-box">
+                <strong>{t["news_impact_tag"]}</strong><br>
+                {item["default_ai"]}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB 4 · AI ANALYST CHAT (MCP CLICKHOUSE)
 # ═════════════════════════════════════════════════════════════════════════════
 with tab_ai:
 
@@ -882,7 +1126,7 @@ with tab_ai:
             st.session_state.total_queries = 0
             st.rerun()
 
-    # Example questions
+    # Preguntas de ejemplo rápidas
     cols = st.columns(len(t["examples"]))
     for col, q in zip(cols, t["examples"]):
         with col:
@@ -892,13 +1136,12 @@ with tab_ai:
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-    # Chat history
+    # Historial de Chat
     if not st.session_state.messages:
         st.markdown(f"""
-        <div style="text-align:center;padding:40px 20px;color:#2A4A6A;">
+        <div style="text-align:center;padding:36px 20px;color:#2A4A6A;">
             <div style="font-size:2rem;margin-bottom:10px;">{t["chat_empty_icon"]}</div>
-            <p style="font-family:'Orbitron',monospace;font-size:.72rem;
-                      letter-spacing:.12em;color:#2A4A6A;">
+            <p style="font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.12em;color:#2A4A6A;">
                 {t["chat_empty_text"]}
             </p>
         </div>
@@ -906,11 +1149,9 @@ with tab_ai:
 
     for msg in st.session_state.messages:
         if msg["role"] == "user":
-            st.markdown(f'<div class="chat-user">👤 &nbsp;{msg["content"]}</div>',
-                        unsafe_allow_html=True)
+            st.markdown(f'<div class="chat-user">👤 &nbsp;{msg["content"]}</div>', unsafe_allow_html=True)
         else:
-            st.markdown(f'<div class="chat-agent">🎬 &nbsp;{msg["content"]}</div>',
-                        unsafe_allow_html=True)
+            st.markdown(f'<div class="chat-agent">🎬 &nbsp;{msg["content"]}</div>', unsafe_allow_html=True)
             if msg.get("data"):
                 with st.expander(t["data_expand"], expanded=True):
                     st.dataframe(pd.DataFrame(msg["data"]), use_container_width=True, hide_index=True)
@@ -921,68 +1162,6 @@ with tab_ai:
                         st.caption(f"{t['mcp_tool']}: `{msg['tool_used']}`  ·  Model: `{_settings.gemini_model}`")
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-    # ── MCP Server availability guard ──────────────────────────────────────
-    # Si el toggle está en "ClickHouse Real", verificar que el servidor MCP
-    # está instalado antes de mostrar el input de chat.
-    if not st.session_state.use_mock:
-        import shutil
-        from config import get_settings
-        _s = get_settings()
-        mcp_cmd = _s.mcp_server_command          # "uvx" o "mcp-clickhouse"
-        mcp_exe_found = shutil.which(mcp_cmd) is not None
-
-        if not mcp_exe_found:
-            st.markdown(f"""
-            <div style="background:#060D1F;border:1px solid rgba(255,45,120,.35);
-                        border-left:3px solid #FF2D78;border-radius:6px;
-                        padding:20px 24px;margin:12px 0;">
-                <div style="font-family:'Orbitron',monospace;font-size:.75rem;
-                            color:#FF2D78;letter-spacing:.12em;margin-bottom:10px;">
-                    ⚠️ SERVIDOR MCP NO INSTALADO
-                </div>
-                <p style="color:#8A8A9A;font-size:.82rem;margin-bottom:14px;">
-                    El ejecutable <code style="color:#FF2D78">{mcp_cmd}</code> no está
-                    en el PATH. Instálalo con <strong style="color:#E8F4FF">una</strong>
-                    de estas opciones y reinicia la app:
-                </p>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                    <div style="flex:1;min-width:220px;background:#020813;border:1px solid #1A2A3A;
-                                border-radius:4px;padding:14px;">
-                        <div style="font-family:'Orbitron',monospace;font-size:.6rem;
-                                    color:#00F5FF;margin-bottom:8px;">OPCIÓN A · pip directo</div>
-                        <code style="color:#00FF9F;font-size:.78rem;display:block;line-height:1.8;">
-                            .venv/Scripts/pip.exe install mcp-clickhouse
-                        </code>
-                        <div style="color:#5A7A9A;font-size:.68rem;margin-top:6px;">
-                            Luego en .env:<br>
-                            <code style="color:#58A6FF">MCP_SERVER_COMMAND=mcp-clickhouse<br>MCP_SERVER_ARGS=</code>
-                        </div>
-                    </div>
-                    <div style="flex:1;min-width:220px;background:#020813;border:1px solid #1A2A3A;
-                                border-radius:4px;padding:14px;">
-                        <div style="font-family:'Orbitron',monospace;font-size:.6rem;
-                                    color:#BF00FF;margin-bottom:8px;">OPCIÓN B · uv tool runner</div>
-                        <code style="color:#00FF9F;font-size:.78rem;display:block;line-height:1.8;">
-                            .venv/Scripts/pip.exe install uv
-                        </code>
-                        <div style="color:#5A7A9A;font-size:.68rem;margin-top:6px;">
-                            .env por defecto ya usa uvx ✓
-                        </div>
-                    </div>
-                </div>
-                <div style="margin-top:14px;padding:10px 14px;background:rgba(0,255,159,.05);
-                            border:1px solid rgba(0,255,159,.2);border-radius:4px;">
-                    <span style="color:#00FF9F;font-size:.75rem;">
-                        💡 O desactiva el toggle <strong>ClickHouse Real</strong>
-                        para seguir en Modo Demo con datos simulados.
-                    </span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            # Deshabilitar el formulario cuando el servidor no está disponible
-            st.stop()
-
     pending = st.session_state.pop("pending_q", None)
 
     with st.form("chat_form", clear_on_submit=True):
@@ -1022,7 +1201,6 @@ with tab_ai:
                 error=clean_err,
             )
 
-        # Si el error es de servidor MCP no encontrado, revertir a modo demo
         if response.error and (
             "MCPServerNotFoundError" in response.error
             or "WinError 2" in response.error
@@ -1050,5 +1228,3 @@ with tab_ai:
         process_query(user_input.strip())
     elif pending and pending.strip():
         process_query(pending.strip())
-
-
