@@ -1,11 +1,11 @@
 """
-app.py - CineMetrics AI · Box Office Dashboard (Neon Holographic · i18n · Full Suite)
-=====================================================================================
+app.py - CineMetrics AI · Box Office Dashboard (Neon Holographic · i18n · Full Suite v3.0)
+=========================================================================================
 Suite completa con:
-  - Tab 📊 DASHBOARD: Filtros interactivos (Género/Territorio/Período), KPIs dinámicos y exportación de Briefing Ejecutivo
-  - Tab 🎮 WHAT-IF SIMULATOR: Simulador interactivo de estrenos con sliders, curvas de proyección y ROI
-  - Tab 📰 INDUSTRY NEWS: Radar de noticias de la industria con análisis de impacto financiero con Gemini
-  - Tab 🤖 AI ANALYST: Chat en lenguaje natural con Gemini + servidor MCP ClickHouse
+  - Tab 📊 DASHBOARD: Filtros interactivos reactivos (Género / Territorio / Período), KPIs dinámicos y exportación de Briefing Ejecutivo
+  - Tab 🎮 WHAT-IF SIMULATOR: Simulador interactivo de estrenos con sliders, curvas de decaimiento y cálculo de ROI en tiempo real
+  - Tab 📰 INDUSTRY NEWS: Radar de noticias con botón de actualización, análisis de impacto IA por Gemini y evaluador de noticias personalizadas
+  - Tab 🤖 AI ANALYST: Chat en lenguaje natural con Gemini + servidor MCP ClickHouse (con esquemas de herramientas sanitizados)
 
 Ejecutar con: streamlit run app.py
 """
@@ -43,7 +43,7 @@ st.set_page_config(
 TRANSLATIONS: dict[str, dict] = {
     "ES": {
         # Header
-        "sys_subtitle":   "SISTEMA DE INTELIGENCIA TAQUILLERA & MARKETING · v2.5",
+        "sys_subtitle":   "SISTEMA DE INTELIGENCIA TAQUILLERA & MARKETING · v3.0",
         "live_label":     "EN VIVO",
         "mode_demo":      "MODO DEMO",
         "mode_live":      "CLICKHOUSE LIVE",
@@ -62,12 +62,12 @@ TRANSLATIONS: dict[str, dict] = {
         "btn_export_brief": "📄 Exportar Briefing Ejecutivo",
         # KPI strip
         "kpi_box_office": "🌍 Taquilla Global",
-        "kpi_tickets":    "🎟️ Entradas Q3",
+        "kpi_tickets":    "🎟️ Entradas Vendidas",
         "kpi_sentiment":  "💬 Sent. Positivo",
         "kpi_films":      "🎞️ Películas Activas",
         "kpi_viewers":    "👁️ Viewers Live",
         # Card titles
-        "c_box_office":   "📈 TAQUILLA GLOBAL · EVOLUCIÓN SEMANAL",
+        "c_box_office":   "📈 EVOLUCIÓN TEMPORAL DE TAQUILLA",
         "c_engagement":   "🎯 ENGAGEMENT DE AUDIENCIA",
         "c_sat_score":    "PUNTUACIÓN DE SATISFACCIÓN",
         "c_demo":         "👥 DEMOGRAFÍA & AUDIENCIA",
@@ -80,12 +80,6 @@ TRANSLATIONS: dict[str, dict] = {
         "c_sentiment":    "💬 SENTIMIENTO SOCIAL",
         "c_positive":     "POSITIVO 74%",
         "c_predict":      "🤖 PREDICCIONES IA",
-        # Chart labels
-        "weeks":          ["Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5"],
-        "weeks_eng":      ["Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5", "Sem 6", "Sem 7", "Sem 8", "Sem 9", "Sem 10", "Sem 11", "Sem 12"],
-        "annot_peak":     "▲ 22%  Pico Sem 3",
-        "donut_center":   "88%\nSCORE",
-        "hover_ticket":   "Sem %{x}: %{y}%",
         # Regional numbers
         "reg_asia": "$620M", "reg_us": "$450M", "reg_eu": "$380M",
         # Sentiment bars
@@ -116,9 +110,8 @@ TRANSLATIONS: dict[str, dict] = {
              "La Mansión: riesgo de caída post-premiere (-58%). Reforzar social ads.",
              "CONF: 78%"),
         ],
-        "badge_wknd":  "▲ 22% vs Media",
-        "best_week":   "Sem 3: $312M · Mejor semana del trimestre",
-        "live_pct":    "▲ 8% EN VIVO",
+        "donut_center":   "88%\nSCORE",
+        "hover_ticket":   "Período %{x}: %{y}%",
         # Simulator
         "sim_title":       "🎮 SIMULADOR DE LANZAMIENTOS & IMPACTO DE MARKETING",
         "sim_desc":        "Modela variables clave de marketing y exhibición para predecir la recaudación del fin de semana de apertura (Opening Weekend) y el ROI.",
@@ -134,8 +127,12 @@ TRANSLATIONS: dict[str, dict] = {
         # News Radar
         "news_title":      "📰 RADAR DE NOTICIAS DE LA INDUSTRIA & ANÁLISIS DE IMPACTO IA",
         "news_desc":       "Monitor en tiempo real de eventos de Hollywood, exhibición y distribución con evaluación de impacto financiero generada por Gemini.",
-        "news_btn_analyze":"⚡ Analizar Impacto con Gemini",
-        "news_impact_tag": "EVALUACIÓN DE IMPACTO:",
+        "news_btn_refresh":"🔄 Actualizar Radar de Noticias",
+        "news_btn_analyze":"⚡ Evaluar con Gemini",
+        "news_impact_tag": "EVALUACIÓN DE IMPACTO IA:",
+        "news_custom_title":"💡 EVALUADOR DE NOTICIAS & RUMORES PERSONALIZADO",
+        "news_custom_desc": "Pega cualquier titular, anuncio o rumor cinematográfico para que Gemini analice su impacto financiero previsto:",
+        "news_custom_btn":  "🚀 Analizar Impacto en Taquilla",
         # AI Chat tab
         "chat_title":       "🤖 GEMINI AI ANALYST · CONSULTA EN LENGUAJE NATURAL",
         "ch_toggle":        "ClickHouse Real",
@@ -160,7 +157,7 @@ TRANSLATIONS: dict[str, dict] = {
     },
     "EN": {
         # Header
-        "sys_subtitle":   "BOX OFFICE & MARKETING INTELLIGENCE SYSTEM · v2.5",
+        "sys_subtitle":   "BOX OFFICE & MARKETING INTELLIGENCE SYSTEM · v3.0",
         "live_label":     "LIVE",
         "mode_demo":      "DEMO MODE",
         "mode_live":      "CLICKHOUSE LIVE",
@@ -179,12 +176,12 @@ TRANSLATIONS: dict[str, dict] = {
         "btn_export_brief": "📄 Export Executive Briefing",
         # KPI strip
         "kpi_box_office": "🌍 Global Box Office",
-        "kpi_tickets":    "🎟️ Tickets Q3",
+        "kpi_tickets":    "🎟️ Total Tickets Sold",
         "kpi_sentiment":  "💬 Positive Sent.",
         "kpi_films":      "🎞️ Active Films",
         "kpi_viewers":    "👁️ Live Viewers",
         # Card titles
-        "c_box_office":   "📈 GLOBAL BOX OFFICE · WEEKLY TREND",
+        "c_box_office":   "📈 BOX OFFICE TIMELINE & EVOLUTION",
         "c_engagement":   "🎯 AUDIENCE ENGAGEMENT",
         "c_sat_score":    "SATISFACTION SCORE",
         "c_demo":         "👥 DEMOGRAPHICS & AUDIENCE",
@@ -197,12 +194,6 @@ TRANSLATIONS: dict[str, dict] = {
         "c_sentiment":    "💬 SOCIAL SENTIMENT",
         "c_positive":     "POSITIVE 74%",
         "c_predict":      "🤖 AI PREDICTIONS",
-        # Chart labels
-        "weeks":          ["Wk 1", "Wk 2", "Wk 3", "Wk 4", "Wk 5"],
-        "weeks_eng":      ["Wk 1", "Wk 2", "Wk 3", "Wk 4", "Wk 5", "Wk 6", "Wk 7", "Wk 8", "Wk 9", "Wk 10", "Wk 11", "Wk 12"],
-        "annot_peak":     "▲ 22%  Wk 3 Peak",
-        "donut_center":   "88%\nSCORE",
-        "hover_ticket":   "Wk %{x}: %{y}%",
         # Regional numbers
         "reg_asia": "$620M", "reg_us": "$450M", "reg_eu": "$380M",
         # Sentiment bars
@@ -233,9 +224,8 @@ TRANSLATIONS: dict[str, dict] = {
              "La Mansión: high post-premiere drop risk (-58%). Boost social ads.",
              "CONF: 78%"),
         ],
-        "badge_wknd":  "▲ 22% vs Avg",
-        "best_week":   "Wk 3: $312M · Best week of the quarter",
-        "live_pct":    "▲ 8% LIVE",
+        "donut_center":   "88%\nSCORE",
+        "hover_ticket":   "Period %{x}: %{y}%",
         # Simulator
         "sim_title":       "🎮 BOX OFFICE & MARKETING WHAT-IF SIMULATOR",
         "sim_desc":        "Model key marketing spend and exhibition variables to forecast opening weekend gross and promotional ROI in real time.",
@@ -251,8 +241,12 @@ TRANSLATIONS: dict[str, dict] = {
         # News Radar
         "news_title":      "📰 INDUSTRY NEWS RADAR & AI IMPACT ASSESSMENT",
         "news_desc":       "Real-time tracking of Hollywood events, exhibition trends, and studio announcements with financial impact analyses by Gemini.",
-        "news_btn_analyze":"⚡ Analyze Impact with Gemini",
+        "news_btn_refresh":"🔄 Refresh News Radar",
+        "news_btn_analyze":"⚡ Evaluate with Gemini",
         "news_impact_tag": "AI IMPACT ASSESSMENT:",
+        "news_custom_title":"💡 CUSTOM FILM NEWS & RUMOR ANALYZER",
+        "news_custom_desc": "Paste any headline, studio announcement, or rumor to let Gemini evaluate its projected box office impact:",
+        "news_custom_btn":  "🚀 Evaluate Box Office Impact",
         # AI Chat tab
         "chat_title":       "🤖 GEMINI AI ANALYST · NATURAL LANGUAGE QUERY",
         "ch_toggle":        "Real ClickHouse",
@@ -360,13 +354,6 @@ html, body, .stApp {
 }
 .stTabs [data-baseweb="tab-panel"]{background:transparent!important;padding:0!important;}
 
-/* Filter Bar */
-.filter-bar{
-    display:flex;gap:12px;align-items:center;padding:10px 14px;
-    background:rgba(0,245,255,0.03);border:1px solid var(--border-dim);
-    border-radius:4px;margin-bottom:12px;
-}
-
 /* Neon Cards */
 .neon-card{
     background:var(--bg-card);border:1px solid var(--border-dim);
@@ -426,16 +413,16 @@ html, body, .stApp {
 /* News Cards */
 .news-card{
     background:var(--bg-card2);border:1px solid var(--border-dim);
-    border-radius:6px;padding:14px;margin-bottom:12px;transition:all 0.2s;
+    border-radius:6px;padding:16px;margin-bottom:14px;transition:all 0.2s;
 }
 .news-card:hover{border-color:var(--neon-cyan);box-shadow:0 0 15px rgba(0,245,255,.1);}
-.news-source{font-family:var(--font-hud);font-size:.6rem;color:var(--neon-cyan);letter-spacing:.1em;}
-.news-headline{font-size:.92rem;font-weight:700;color:var(--text-bright);margin:4px 0;}
-.news-summary{font-size:.78rem;color:var(--text-dim);line-height:1.5;}
+.news-source{font-family:var(--font-hud);font-size:.62rem;color:var(--neon-cyan);letter-spacing:.1em;}
+.news-headline{font-size:1rem;font-weight:700;color:var(--text-bright);margin:6px 0;}
+.news-summary{font-size:.82rem;color:var(--text-dim);line-height:1.5;}
 .news-impact-box{
-    margin-top:10px;padding:10px 12px;background:rgba(191,0,255,.06);
-    border-left:2px solid var(--neon-purple);border-radius:0 4px 4px 0;
-    font-size:.78rem;color:#D8B4FE;
+    margin-top:12px;padding:12px 14px;background:rgba(191,0,255,.08);
+    border-left:3px solid var(--neon-purple);border-radius:0 4px 4px 0;
+    font-size:.82rem;color:#E9D5FF;line-height:1.6;
 }
 
 /* Chat */
@@ -518,9 +505,8 @@ def init_session():
         "total_queries": 0,
         "session_start": datetime.now().strftime("%H:%M"),
         "lang":          "ES",
-        "filter_genre":  "Todos los Géneros",
-        "filter_region": "Global",
-        "news_analysis": {},
+        "news_feed_ver": 1,
+        "custom_evals":  [],
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -530,7 +516,7 @@ init_session()
 t = TRANSLATIONS[st.session_state.lang]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CHART HELPERS (PLOTLY NEON)
+# CHART HELPERS (DYNAMIC TIMELINE BASED ON PERIOD / GENRE / TERRITORY)
 # ─────────────────────────────────────────────────────────────────────────────
 PLOTLY_BASE = dict(
     plot_bgcolor="rgba(0,0,0,0)",
@@ -554,19 +540,47 @@ CHART_CFG = {"displayModeBar": False, "responsive": True}
 _Y_BASE = dict(gridcolor="rgba(0,245,255,0.06)", zerolinecolor="rgba(0,245,255,0.1)", tickfont=dict(color="#5A7A9A", size=9))
 
 
-def chart_box_office(t: dict, multiplier: float = 1.0) -> go.Figure:
-    base_gross = [148, 221, 312, 278, 355]
-    gross = [round(v * multiplier, 1) for v in base_gross]
+def get_timeline_data(period_sel: str, genre_mult: float, terr_mult: float):
+    """Calcula etiquetas temporales y valores en base al período seleccionado."""
+    base_mult = genre_mult * terr_mult
+
+    if "12 Meses" in period_sel or "12 Months" in period_sel:
+        ticks = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        base_vals = [280, 310, 390, 420, 580, 690, 750, 620, 480, 510, 680, 890]
+        peak_idx = 11
+        peak_label = "Dic Peak"
+    elif "Q4" in period_sel or "Forecast" in period_sel:
+        ticks = ["Sem 40", "Sem 41", "Sem 42", "Sem 43", "Sem 44", "Sem 45", "Navidad"]
+        base_vals = [190, 240, 290, 360, 410, 480, 620]
+        peak_idx = 6
+        peak_label = "Navidad Peak"
+    elif "Histórico" in period_sel or "Historical" in period_sel:
+        ticks = ["Q1'25", "Q2'25", "Q3'25", "Q4'25", "Q1'26", "Q2'26", "Q3'26", "Q4'26"]
+        base_vals = [1200, 1450, 1680, 2100, 1380, 1590, 1850, 2350]
+        peak_idx = 7
+        peak_label = "Q4'26 Proy."
+    else:
+        # Default Q3 (5 semanas)
+        ticks = ["Sem 1", "Sem 2", "Sem 3", "Sem 4", "Sem 5"]
+        base_vals = [148, 221, 312, 278, 355]
+        peak_idx = 2
+        peak_label = "Sem 3 Peak"
+
+    vals = [round(v * base_mult, 1) for v in base_vals]
+    return ticks, vals, peak_idx, peak_label
+
+
+def chart_box_office_dynamic(ticks: list, vals: list, peak_idx: int, peak_label: str) -> go.Figure:
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=t["weeks"], y=gross, mode="lines+markers",
+        x=ticks, y=vals, mode="lines+markers",
         fill="tozeroy", fillcolor="rgba(0,245,255,0.07)",
         line=dict(color="#00F5FF", width=2.5, shape="spline"),
         marker=dict(color="#00F5FF", size=6, line=dict(color="#001A2E", width=2)),
         name="Box Office", hovertemplate="%{y}M$<extra></extra>",
     ))
     fig.add_annotation(
-        x=t["weeks"][2], y=gross[2], text=f"{t['annot_peak']}: ${gross[2]}M",
+        x=ticks[peak_idx], y=vals[peak_idx], text=f"▲ {peak_label}: ${vals[peak_idx]}M",
         font=dict(color="#00FF9F", size=9, family="Orbitron"),
         showarrow=False, yshift=14,
         bgcolor="rgba(0,255,159,0.12)", bordercolor="rgba(0,255,159,0.4)",
@@ -575,7 +589,7 @@ def chart_box_office(t: dict, multiplier: float = 1.0) -> go.Figure:
     fig.update_layout(**PLOTLY_BASE)
     fig.update_layout(
         height=170,
-        yaxis=dict(**_Y_BASE, tickprefix="$", ticksuffix="M", range=[0, max(gross) * 1.35]),
+        yaxis=dict(**_Y_BASE, tickprefix="$", ticksuffix="M", range=[0, max(vals) * 1.35]),
     )
     return fig
 
@@ -623,8 +637,8 @@ def chart_demographics(t: dict) -> go.Figure:
     return fig
 
 
-def chart_engagement(t: dict) -> go.Figure:
-    vals = [62, 71, 58, 88, 75, 90, 83, 95, 79, 88, 91, 97]
+def chart_engagement(t: dict, multiplier: float = 1.0) -> go.Figure:
+    vals = [round(min(100, v * (0.85 + 0.15 * multiplier))) for v in [62, 71, 58, 88, 75, 90, 83, 95, 79, 88, 91, 97]]
     fig = go.Figure()
     fig.add_trace(go.Bar(
         x=t["weeks_eng"], y=vals,
@@ -669,7 +683,6 @@ def chart_sentiment(t: dict) -> go.Figure:
 
 def chart_simulator_decay(opening_m: float) -> go.Figure:
     weeks = ["Wk 1 (Opening)", "Wk 2", "Wk 3", "Wk 4", "Wk 5"]
-    # Standard blockbuster drop: -50%, -40%, -35%, -30%
     gross = [
         round(opening_m, 1),
         round(opening_m * 0.52, 1),
@@ -749,7 +762,7 @@ tab_dash, tab_sim, tab_news, tab_ai = st.tabs([
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# TAB 1 · DASHBOARD
+# TAB 1 · DASHBOARD (FILTROS REACTIVOS Y PROYECCIONES DINÁMICAS)
 # ═════════════════════════════════════════════════════════════════════════════
 with tab_dash:
 
@@ -767,52 +780,73 @@ with tab_dash:
             st.session_state["show_briefing_modal"] = True
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Multiplicador dinámico basado en filtros para interactividad viva
-    genre_mult = 1.35 if "Sci-Fi" in sel_genre else (1.2 if "Acción" in sel_genre or "Action" in sel_genre else 1.0)
-    terr_mult = 0.6 if "Europe" in sel_terr or "Europa" in sel_terr else (0.75 if "Asia" in sel_terr else 1.0)
-    dyn_mult = round(genre_mult * terr_mult, 2)
+    # ── FACTORES DE ESCALA DINÁMICOS POR FILTRO ────────────────────────────
+    genre_mult = 1.35 if "Sci-Fi" in sel_genre else (1.20 if "Acción" in sel_genre or "Action" in sel_genre else (0.85 if "Terror" in sel_genre or "Horror" in sel_genre else 1.0))
+    terr_mult = 0.55 if "Europe" in sel_terr or "Europa" in sel_terr else (0.75 if "Asia" in sel_terr else (0.40 if "Latino" in sel_terr or "Latin" in sel_terr else 1.0))
+
+    # Factor de escala según período seleccionado
+    if "12 Meses" in sel_period or "12 Months" in sel_period:
+        period_factor = 2.6
+        period_kpi_label = "$4.82B"
+        tickets_kpi_label = "42.8M"
+    elif "Q4" in sel_period or "Forecast" in sel_period:
+        period_factor = 1.25
+        period_kpi_label = "$2.31B"
+        tickets_kpi_label = "21.6M"
+    elif "Histórico" in sel_period or "Historical" in sel_period:
+        period_factor = 5.2
+        period_kpi_label = "$9.65B"
+        tickets_kpi_label = "94.2M"
+    else:
+        # Q3 base
+        period_factor = 1.0
+        period_kpi_label = f"${round(1.85 * genre_mult * terr_mult, 2)}B"
+        tickets_kpi_label = f"{round(18.4 * genre_mult * terr_mult, 1)}M"
+
+    dyn_total_gross = f"${round(1.85 * genre_mult * terr_mult * (period_factor if period_factor <= 1.5 else 1.0), 2)}B"
+    if period_factor > 1.5:
+        dyn_total_gross = f"${round(float(period_kpi_label.replace('$','').replace('B','')) * genre_mult * terr_mult, 2)}B"
+
+    dyn_ticks, dyn_vals, peak_idx, peak_label = get_timeline_data(sel_period, genre_mult, terr_mult)
 
     # ── MODAL / EXPANDER DE BRIEFING EJECUTIVO ─────────────────────────────
     if st.session_state.get("show_briefing_modal", False):
-        with st.expander("📄 EXECUTIVE BRIEFING · Q3 STRATEGY REPORT", expanded=True):
+        with st.expander("📄 EXECUTIVE STRATEGY BRIEFING · DESCARGABLE", expanded=True):
             briefing_text = f"""### 🎬 CINEMETRICS AI · EXECUTIVE STRATEGY BRIEFING
-**Fecha de Emisión:** {now.strftime('%d/%m/%Y %H:%M')} | **Filtro Aplicado:** {sel_genre} · {sel_terr} · {sel_period}
+**Fecha:** {now.strftime('%d/%m/%Y %H:%M')} | **Filtros:** {sel_genre} · {sel_terr} · {sel_period}
 
 ---
-#### 1. Resumen Ejecutivo de Rendimiento
-* **Recaudación Global Acumulada:** ${round(1.85 * dyn_mult, 2)}B (+22% vs trimestre anterior).
-* **Entradas Vendidas:** {round(18.4 * dyn_mult, 1)}M tickets en 47 territorios activos.
-* **Índice de Satisfacción (CSAT):** 88% (Score de alta retención).
+#### 1. Rendimiento Global Consolidado
+* **Volumen Total de Taquilla:** {dyn_total_gross} ({sel_period}).
+* **Volumen de Entradas Proyectado:** {tickets_kpi_label} tickets.
+* **Índice de Retención & Satisfacción:** 88% (Puntuación Excelente).
 
-#### 2. Hallazgos Clave de Exhibición
-* **Dominancia Premium:** El formato **IMAX / PLF** genera una prima de recaudación del **+41.4%** respecto a salas estándar.
-* **Retorno Publicitario:** Las campañas en **Marketing Digital** superan a la TV tradicional con un **ROI de 3.80x vs 2.20x**.
-* **Territorios Líderes:** México, España y EE.UU. concentran el 68% de las reservas anticipadas en preventa.
+#### 2. Hallazgos Clave de Exhibición y Marketing
+* **Prima de Gran Formato (IMAX / PLF):** +41.4% de recaudación comparado con salas tradicionales.
+* **Eficiencia de Campañas:** El canal Digital rinde a **3.80x ROI**, superando ampliamente a la televisión tradicional (**2.20x ROI**).
+* **Foco Territorial:** Gran tracción en preventa en México, España y Norteamérica.
 
-#### 3. Recomendaciones Estratégicas para la Junta
-1. **Reasignar 25% del gasto publicitario** de televisión lineal hacia campañas programáticas en redes sociales y streaming.
-2. **Ampliar contratos de permanencia en pantallas IMAX** para el fin de semana 2 y 3 en títulos de ciencia ficción y acción.
+#### 3. Acciones Inmediatas Recomendadas
+1. Escalar inversión en marketing de video vertical (TikTok/Instagram) para el target de 18-34 años.
+2. Asegurar retención de salas premium en semana 2 para títulos del segmento {sel_genre}.
 """
             st.markdown(briefing_text)
             st.download_button(
                 "💾 Descargar Briefing (.md)",
                 data=briefing_text,
-                file_name=f"CineMetrics_Executive_Briefing_{now.strftime('%Y%m%d')}.md",
+                file_name=f"CineMetrics_Briefing_{now.strftime('%Y%m%d_%H%M')}.md",
                 mime="text/markdown",
             )
 
     # ── KPI STRIP DINÁMICO ─────────────────────────────────────────────────
-    box_office_val = f"${round(1.85 * dyn_mult, 2)}B"
-    tickets_val = f"{round(18.4 * dyn_mult, 1)}M"
-
     st.markdown(f"""
     <div class="mini-kpi-row">
         <div class="mini-kpi">
-            <span class="mini-kpi-val">{box_office_val}</span>
-            <span class="mini-kpi-lbl">{t["kpi_box_office"]}</span>
+            <span class="mini-kpi-val">{dyn_total_gross}</span>
+            <span class="mini-kpi-lbl">{t["kpi_box_office"]} ({sel_period[:10]})</span>
         </div>
         <div class="mini-kpi" style="border-color:rgba(191,0,255,.3);">
-            <span class="mini-kpi-val" style="color:#BF00FF;text-shadow:0 0 8px #BF00FF;">{tickets_val}</span>
+            <span class="mini-kpi-val" style="color:#BF00FF;text-shadow:0 0 8px #BF00FF;">{tickets_kpi_label}</span>
             <span class="mini-kpi-lbl">{t["kpi_tickets"]}</span>
         </div>
         <div class="mini-kpi" style="border-color:rgba(0,255,159,.3);">
@@ -836,15 +870,15 @@ with tab_dash:
     with c1:
         st.markdown(f"""
         <div class="neon-card" style="margin-bottom:0">
-            <div class="card-title cyan">{t["c_box_office"]}</div>
+            <div class="card-title cyan">{t["c_box_office"]} · {sel_period.upper()}</div>
             <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
-                <span class="big-metric" style="font-size:1.8rem;">{box_office_val}</span>
-                <span class="metric-badge badge-up">{t["badge_wknd"]}</span>
+                <span class="big-metric" style="font-size:1.8rem;">{dyn_total_gross}</span>
+                <span class="metric-badge badge-up">{sel_genre}</span>
             </div>
-            <div class="metric-sub">{t["best_week"]} ({sel_genre})</div>
+            <div class="metric-sub">{peak_label}: ${dyn_vals[peak_idx]}M · Territorio: {sel_terr}</div>
         </div>
         """, unsafe_allow_html=True)
-        st.plotly_chart(chart_box_office(t, dyn_mult), use_container_width=True, config=CHART_CFG)
+        st.plotly_chart(chart_box_office_dynamic(dyn_ticks, dyn_vals, peak_idx, peak_label), use_container_width=True, config=CHART_CFG)
 
     with c2:
         st.markdown(f"""
@@ -854,10 +888,10 @@ with tab_dash:
                 <span class="big-metric purple" style="font-size:1.5rem;">88%</span>
                 <span class="metric-badge badge-up">{t["c_sat_score"]}</span>
             </div>
-            <div class="metric-sub">↑ 3pts vs mes anterior</div>
+            <div class="metric-sub">↑ 3pts vs media histórica</div>
         </div>
         """, unsafe_allow_html=True)
-        st.plotly_chart(chart_engagement(t), use_container_width=True, config=CHART_CFG)
+        st.plotly_chart(chart_engagement(t, genre_mult), use_container_width=True, config=CHART_CFG)
 
         st.markdown(f"""
         <div class="neon-card" style="margin-bottom:0;padding:10px 14px;">
@@ -917,27 +951,27 @@ with tab_dash:
     with c4:
         st.markdown(f"""
         <div class="neon-card pink" style="margin-bottom:0;">
-            <div class="card-title pink">{t["c_regional"]} ({sel_terr})</div>
+            <div class="card-title pink">{t["c_regional"]} · {sel_terr.upper()}</div>
             <div style="display:flex;gap:14px;margin-bottom:4px;">
                 <div>
                     <span style="font-family:'Orbitron',monospace;font-size:.85rem;color:#FF2D78;">
-                        ${round(620 * dyn_mult)}M</span>
+                        ${round(620 * genre_mult * terr_mult)}M</span>
                     <span style="font-size:.6rem;color:#5A7A9A;"> ASIA</span>
                 </div>
                 <div>
                     <span style="font-family:'Orbitron',monospace;font-size:.85rem;color:#00F5FF;">
-                        ${round(450 * dyn_mult)}M</span>
+                        ${round(450 * genre_mult * terr_mult)}M</span>
                     <span style="font-size:.6rem;color:#5A7A9A;"> US</span>
                 </div>
                 <div>
                     <span style="font-family:'Orbitron',monospace;font-size:.85rem;color:#BF00FF;">
-                        ${round(380 * dyn_mult)}M</span>
+                        ${round(380 * genre_mult * terr_mult)}M</span>
                     <span style="font-size:.6rem;color:#5A7A9A;"> EU</span>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
-        st.plotly_chart(chart_regional(t, dyn_mult), use_container_width=True, config=CHART_CFG)
+        st.plotly_chart(chart_regional(t, genre_mult * terr_mult), use_container_width=True, config=CHART_CFG)
 
     with c5:
         bars_html = "".join(f"""
@@ -1009,7 +1043,6 @@ with tab_sim:
         st.markdown('</div>', unsafe_allow_html=True)
 
         # Cálculo del modelo predictivo en tiempo real
-        # Factor base por género + ROI digital (3.8x) + ROI TV (2.2x) + Boost IMAX
         genre_base = 45.0 if "Sci-Fi" in sim_genre else (38.0 if "Acción" in sim_genre else 20.0)
         dig_impact = sim_digital * 3.8
         tv_impact  = sim_tv * 2.2
@@ -1046,48 +1079,79 @@ with tab_sim:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# TAB 3 · INDUSTRY NEWS & RADAR
+# TAB 3 · INDUSTRY NEWS & RADAR CON BOTÓN DE ACTUALIZACIÓN & EVALUADOR
 # ═════════════════════════════════════════════════════════════════════════════
 with tab_news:
-    st.markdown(f"""
-    <div style="padding:8px 0 14px;">
-        <div style="font-family:'Orbitron',monospace;font-size:.85rem;color:#00F5FF;letter-spacing:.12em;">
-            {t["news_title"]}
+    n_head_col, n_btn_col = st.columns([4, 1.5])
+    with n_head_col:
+        st.markdown(f"""
+        <div style="padding:4px 0 10px;">
+            <div style="font-family:'Orbitron',monospace;font-size:.85rem;color:#00F5FF;letter-spacing:.12em;">
+                {t["news_title"]}
+            </div>
+            <div style="color:#5A7A9A;font-size:.82rem;margin-top:2px;">
+                {t["news_desc"]}
+            </div>
         </div>
-        <div style="color:#5A7A9A;font-size:.82rem;margin-top:4px;">
-            {t["news_desc"]}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-    NEWS_ITEMS = [
-        {
-            "id": "news_1",
-            "source": "VARIETY · EXHIBITION RADAR",
-            "headline": "IMAX expande su red global con 120 nuevas salas premium en Asia y Latinoamérica",
-            "date": "Hace 2 horas · Mercado Global",
-            "body": "La compañía de gran formato anuncia acuerdos con cadenas líderes en Japón, Corea y México ante la demanda récord de entradas para franquicias de ciencia ficción.",
-            "default_ai": "📈 **Impacto Proyectado:** +18% en recaudación internacional para blockbusters en Q4. Se recomienda negociar ventanas extendidas de exclusividad PLF de al menos 3 semanas.",
-        },
-        {
-            "id": "news_2",
-            "source": "DEADLINE · MARKETING SHIFT",
-            "headline": "Los estudios de Hollywood reducen un 30% el gasto en TV tradicional en favor de TikTok y streaming ads",
-            "date": "Hace 5 horas · Estrategia",
-            "body": "Nuevos reportes confirman que el costo por adquisición de audiencia juvenil (18-34 años) es 3.2 veces más eficiente en plataformas sociales que en televisión abierta.",
-            "default_ai": "💡 **Acción Sugerida:** Reasignar presupuesto de campañas otoño/invierno hacia micro-influencers de cine y compra programática de video vertical para maximizar el ROI.",
-        },
-        {
-            "id": "news_3",
-            "source": "BOXOFFICE PRO · BOX OFFICE PULSE",
-            "headline": "Las preventas de 'Galactic Odyssey 2' superan los 85M$ en su primera semana",
-            "date": "Ayer · Taquilla",
-            "body": "La secuela espacial apunta a un fin de semana de apertura global superior a los 220M$, impulsada por una retención del 95% en salas de gran formato.",
-            "default_ai": "🎯 **Proyección:** Probabilidad del 91% de superar el récord trimestral de taquilla. Riesgo bajo de canibalización con títulos competidores en su ventana de estreno.",
-        },
-    ]
+    with n_btn_col:
+        st.markdown("<div style='padding-top:6px;'>", unsafe_allow_html=True)
+        if st.button(t["news_btn_refresh"], use_container_width=True):
+            st.session_state.news_feed_ver = (st.session_state.news_feed_ver % 2) + 1
+            st.toast("✅ Radar de noticias sincronizado con el mercado.", icon="📡")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    for item in NEWS_ITEMS:
+    NEWS_FEEDS = {
+        1: [
+            {
+                "id": "news_1",
+                "source": "VARIETY · EXHIBITION RADAR",
+                "headline": "IMAX expande su red global con 120 nuevas salas premium en Asia y Latinoamérica",
+                "date": "Hace 15 min · Mercado Global",
+                "body": "La compañía de gran formato anuncia acuerdos con cadenas líderes en Japón, Corea y México ante la demanda récord de entradas para franquicias de ciencia ficción.",
+                "default_ai": "📈 **Impacto Proyectado:** +18% en recaudación internacional para blockbusters en Q4. Se recomienda negociar ventanas extendidas de exclusividad PLF de al menos 3 semanas.",
+            },
+            {
+                "id": "news_2",
+                "source": "DEADLINE · MARKETING SHIFT",
+                "headline": "Los estudios de Hollywood reducen un 30% el gasto en TV tradicional en favor de TikTok y streaming ads",
+                "date": "Hace 1 hora · Estrategia",
+                "body": "Nuevos reportes confirman que el costo por adquisición de audiencia juvenil (18-34 años) es 3.2 veces más eficiente en plataformas sociales que en televisión abierta.",
+                "default_ai": "💡 **Acción Sugerida:** Reasignar presupuesto de campañas otoño/invierno hacia micro-influencers de cine y compra programática de video vertical para maximizar el ROI.",
+            },
+            {
+                "id": "news_3",
+                "source": "BOXOFFICE PRO · BOX OFFICE PULSE",
+                "headline": "Las preventas de 'Galactic Odyssey 2' superan los 85M$ en su primera semana",
+                "date": "Hace 3 horas · Taquilla",
+                "body": "La secuela espacial apunta a un fin de semana de apertura global superior a los 220M$, impulsada por una retención del 95% en salas de gran formato.",
+                "default_ai": "🎯 **Proyección:** Probabilidad del 91% de superar el récord trimestral de taquilla. Riesgo bajo de canibalización con títulos competidores en su ventana de estreno.",
+            },
+        ],
+        2: [
+            {
+                "id": "news_4",
+                "source": "THE HOLLYWOOD REPORTER · STREAMING & THEATRICAL",
+                "headline": "El público post-pandemia consolida el hábito de acudir a salas solo para eventos cinematográficos masivos",
+                "date": "Actualizado ahora · Tendencias",
+                "body": "Un estudio revela que el 72% de los espectadores de entre 18 y 45 años reservan su entrada exclusivamente en formatos inmersivos (IMAX, 4DX, Dolby Cinema).",
+                "default_ai": "🔥 **Oportunidad:** Fortalecer el ticket medio con paquetes de preventa con merchandising exclusivo y pases de medianoche.",
+            },
+            {
+                "id": "news_5",
+                "source": "SCREEN DAILY · EUROPEAN BOX OFFICE",
+                "headline": "España y Francia lideran el crecimiento de cuota de pantalla en Europa este trimestre (+14%)",
+                "date": "Hace 45 min · Europa",
+                "body": "Las campañas promocionales de Fiesta del Cine y las preventas escalonadas impulsan la afluencia en salas en el sur de Europa a máximos del año.",
+                "default_ai": "🇪🇸 **Estrategia Local:** Reforzar la distribución en copias dobladas y subtituladas en Cataluña, Madrid y Andalucía para capturar el pico de demanda de otoño.",
+            },
+        ]
+    }
+
+    current_items = NEWS_FEEDS.get(st.session_state.news_feed_ver, NEWS_FEEDS[1])
+
+    for item in current_items:
         st.markdown(f"""
         <div class="news-card">
             <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -1099,6 +1163,60 @@ with tab_news:
             <div class="news-impact-box">
                 <strong>{t["news_impact_tag"]}</strong><br>
                 {item["default_ai"]}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── EVALUADOR DE NOTICIAS PERSONALIZADAS ───────────────────────────────
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="neon-card purple">
+        <div class="card-title purple">{t["news_custom_title"]}</div>
+        <div style="font-size:.8rem;color:#5A7A9A;margin-bottom:10px;">{t["news_custom_desc"]}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("custom_news_form", clear_on_submit=False):
+        custom_txt = st.text_input(
+            "news_input", label_visibility="collapsed",
+            placeholder="Ej: Warner Bros anuncia que rodará la secuela de Dune íntegramente en formato IMAX para Noviembre 2027...",
+        )
+        submit_custom = st.form_submit_button(t["news_custom_btn"], use_container_width=True)
+
+    if submit_custom and custom_txt.strip():
+        with st.spinner("🧠 Gemini analizando impacto económico y taquillero..."):
+            try:
+                import google.genai as genai
+                from google.genai import types
+                client = genai.Client(api_key=_settings.google_api_key)
+                prompt = (
+                    f"Actúa como analista financiero experto de la industria del cine para CineMetrics AI. "
+                    f"Analiza la siguiente noticia o rumor: '{custom_txt}'. "
+                    f"En 2 o 3 párrafos concisos con viñetas y emojis: "
+                    f"1. Evalúa el impacto financiero previsto en taquilla internacional (estimación $ y %). "
+                    f"2. Identifica el público objetivo y territorios más sensibles. "
+                    f"3. Da una recomendación estratégica de marketing y exhibición. Responde en {st.session_state.lang}."
+                )
+                res = client.models.generate_content(
+                    model=_settings.gemini_model.removeprefix("models/"),
+                    contents=prompt,
+                )
+                eval_text = res.text or "Sin respuesta."
+                st.session_state.custom_evals.insert(0, {"query": custom_txt, "response": eval_text})
+            except Exception as e:
+                st.error(f"Error evaluando noticia con Gemini: {e}")
+
+    for ev in st.session_state.custom_evals:
+        st.markdown(f"""
+        <div class="news-card" style="border-left:3px solid #BF00FF;">
+            <div style="font-family:'Orbitron',monospace;font-size:.65rem;color:#BF00FF;margin-bottom:4px;">
+                ANÁLISIS PERSONALIZADO GEMINI AI
+            </div>
+            <div style="font-size:.88rem;font-weight:700;color:#E8F4FF;margin-bottom:8px;">
+                "{ev["query"]}"
+            </div>
+            <div style="font-size:.82rem;color:#D8B4FE;line-height:1.6;">
+                {ev["response"]}
             </div>
         </div>
         """, unsafe_allow_html=True)

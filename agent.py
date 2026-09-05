@@ -108,6 +108,39 @@ class AgentResponse:
 # AGENTE PRINCIPAL
 # =============================================================================
 
+def _sanitize_schema_for_gemini(schema: Any) -> Any:
+    """
+    Sanitiza recursivamente un esquema JSON para que cumpla estrictamente
+    con lo que espera FunctionDeclaration en el SDK google-genai de Google Cloud.
+    Elimina campos incompatibles como exclusiveMinimum, exclusiveMaximum, $schema, additionalProperties, etc.
+    """
+    if not isinstance(schema, dict):
+        return schema
+
+    forbidden_keys = {
+        "$schema", "additionalProperties", "exclusiveMinimum", "exclusiveMaximum",
+        "definitions", "$defs", "$id", "$ref", "title", "id"
+    }
+
+    clean = {}
+    for k, v in schema.items():
+        if k in forbidden_keys:
+            continue
+        if isinstance(v, dict):
+            clean[k] = _sanitize_schema_for_gemini(v)
+        elif isinstance(v, list):
+            clean[k] = [_sanitize_schema_for_gemini(item) if isinstance(item, dict) else item for item in v]
+        else:
+            clean[k] = v
+
+    if "type" in clean and isinstance(clean["type"], str):
+        type_upper = clean["type"].upper()
+        if type_upper in ("OBJECT", "STRING", "INTEGER", "NUMBER", "BOOLEAN", "ARRAY"):
+            clean["type"] = type_upper
+
+    return clean
+
+
 class CineMetricsAgent:
     """
     Agente de IA que combina Gemini (Interactions API) con herramientas MCP.
@@ -141,18 +174,17 @@ class CineMetricsAgent:
         """Convierte herramientas MCP al formato de Function Declarations de Gemini."""
         declarations = []
         for tool in mcp_tools:
-            params = dict(tool.get("parameters", {}))
-            # Eliminar keys no soportadas por la API de Gemini
-            params.pop("$schema", None)
-            params.pop("additionalProperties", None)
+            raw_params = tool.get("parameters", {})
+            sanitized_params = _sanitize_schema_for_gemini(raw_params)
             declarations.append(
                 genai_types.FunctionDeclaration(
                     name=tool["name"],
                     description=tool.get("description", ""),
-                    parameters=params,
+                    parameters=sanitized_params,
                 )
             )
         return [genai_types.Tool(function_declarations=declarations)]
+
 
     async def run(self, user_query: str) -> AgentResponse:
         """
