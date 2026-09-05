@@ -333,10 +333,16 @@ class CineMetricsAgent:
             text_chunks = []
             if response.candidates and response.candidates[0].content:
                 for part in response.candidates[0].content.parts:
-                    if hasattr(part, "text") and part.text:
-                        text_chunks.append(part.text)
+                    t_val = getattr(part, "text", None)
+                    if t_val:
+                        text_chunks.append(t_val)
 
-            answer_text = "".join(text_chunks) if text_chunks else (response.text or "")
+            answer_text = "".join(text_chunks).strip()
+            if not answer_text:
+                try:
+                    answer_text = response.text or ""
+                except Exception:
+                    answer_text = ""
 
             # Fallback si no hay texto pero hubo un error en la herramienta
             if not answer_text and isinstance(last_tool_result, dict) and "error" in last_tool_result:
@@ -344,6 +350,9 @@ class CineMetricsAgent:
                     f"⚠️ **Error en ClickHouse:** {last_tool_result['error']}\n\n"
                     "*Sugerencia:* Si no dispones de un servidor ClickHouse en ejecución, desactiva la casilla 'ClickHouse Real' para operar con datos de muestra en Modo Demo."
                 )
+            elif not answer_text and table_data:
+                answer_text = "Se han recuperado los datos solicitados de ClickHouse. Puedes consultar la tabla inferior."
+
 
             return AgentResponse(
                 answer=answer_text,
